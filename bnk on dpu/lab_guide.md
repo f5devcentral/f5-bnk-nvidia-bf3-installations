@@ -14,13 +14,14 @@
       - [DPU](#dpu)
     - [Software Prerequisites](#software-prerequisites)
   - [Installation Steps](#installation-steps)
-    - [Prepare the Host](#prepare-the-host)
+    - [Prepare the Hosts](#prepare-the-hosts)
       - [Install DOCA Software](#install-doca-software)
       - [Configure Rshim service and interface.](#configure-rshim-service-and-interface)
       - [Configure Virtual Function on host](#configure-virtual-function-on-host)
-      - [Install Kubernetes](#install-kubernetes)
+      - [Install Kubernetes Prerequisites](#install-kubernetes-prerequisites)
       - [Prepare for DPU Install](#prepare-for-dpu-install)
-    - [Ready to join DPU to K8S](#ready-to-join-dpu-to-k8s)
+    - [Configure Kubernetes Cluster](#configure-kubernetes-cluster)
+    - [Install BIG-IP Next for Kubernetes](#install-big-ip-next-for-kubernetes)
 
 ## Introduction
 
@@ -52,15 +53,15 @@ The following section describes implementation details for a lab setup.
 ### Deployment Strategy
 For the purpose of this document, the diagram below illustrates a high-level deployment strategy for BIG-IP Next for Kubernetes on Nvidia BlueField-3 DPU. It assumes a specific Nvidia BlueField-3 networking configuration, utilizing Scalable Functions, Virtual Functions, and Open vSwitch (OVS) to connect the DPU, Host, and external uplink ports.
 
-This lab guide configures a two node cluster where the host acts as control plan and worker node, and the Nvidia DPU acts as workload node in the same Kubernetes cluster.
+This lab guide configures a single Kubernetes cluster that includes Hosts and DPUs as worker nodes. It assumes that one of the hosts will act as a Kuberentes controller (and allows workload deployment) while other hosts and DPUs join the cluster as worker nodes.
 
 
-![bnk-lab-diagram](media/bnk_lab_diagram.svg)
+![bnk-lab-diagram](media/nvidia_bnk_lab_diagram.svg)
 
 There are three main networks in the diagram:\
 **Management Network:** The main underlay network for the Kubernetes cluster CNI and has the default gateway to reach internet. Both Host and the Nvidia BF-3 DPU are connected to this network and has addresses configured through DHCP.\
-**Internal Net:** Represents an internal network path between the host deployed services and the BNK Dataplane deployed in the DPU. This network will be utilized to route ingress and egress traffic for workload deployed on the host through BNK Dataplane.\
-**External Net:** The external network represents an "external-to-the-cluster" infrastructure network segment to reach external services/destinations.
+**Internal Network:** Represents an internal network path between the host deployed services and the BNK Dataplane deployed in the DPU. This network will be utilized to route ingress and egress traffic for workload deployed on the host through BNK Dataplane.\
+**External Network:** The external network represents an "external-to-the-cluster" infrastructure network segment to reach external services/destinations.
 
 The Test Servers represent clients and servers that are reachable on different segments of the network.\
 >_This could also be a single server connected to both Internal and External networks_
@@ -156,7 +157,11 @@ Organizing software requirements for a multi-node Kubernetes cluster involves st
 
 ## Installation Steps
 
-### Prepare the Host
+### Prepare the Hosts
+
+All Host machines are assumed here to have Ubuntu 22.04.\
+Perform these steps on **all hosts** you would like to join to the cluster.
+
 
 #### Install DOCA Software
 
@@ -177,7 +182,7 @@ host# /usr/sbin/ofed_uninstall.sh --force
 host# sudo apt-get autoremove
 ```
 
-Install DOCA-all on host.\
+Install DOCA-all or DOCA-net.\
 >Note: Make sure to select the correct architecture for the host. In this example it is x86_64.
 
 These instructions are from [DOCA software download site](https://developer.nvidia.com/doca-downloads?deployment_platform=Host-Server&deployment_package=DOCA-Host&target_os=Linux)
@@ -218,12 +223,53 @@ Dec 15 18:46:44 node6 rshim[3675]: rshim0 attached
 ```
 
 The Rshim driver exposes a virtual interface named `tmfifo_net0` and the default network configuration for the DPU tmfifo interface is `192.168.100.2/30`\
-> Note: If the host has more than 1 DPU attached you will see one `tmfifo_netX` interface per DPU.
+
 
 Configure an IP address on the host `tmfifo_net0` interface as a way to connect to DPU if needed.
 ```shell
 host# ip addr add 192.168.100.1/30 dev tmfifo_net0
 ```
+
+To persist the configuration create the file `/etc/netplan/50-tmfifo.yaml`
+```shell
+host# cat << EONETPLAN > /etc/netplan/50-tmfifo.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    tmfifo_net0:
+      dhcp4: no
+      addresses:
+        - 192.168.100.1/30
+EONETPLAN
+host# netplan apply
+```
+<details><summary>For more than 1 DPU on the same host</summary>
+
+If the host has more than 1 DPU attached you will see one `tmfifo_netX` interface per DPU, for example: `tmfifo_net0` and `tmfifo_net1`.\
+Adjust the netplan configuration to create a bridge including the tmfifo virtual interfaces and configure the IP address on the bridge.
+```yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    tmfifo_net0:
+      dhcp4: no
+      dhcp6: no
+    tmfifo_net1:
+      dhcp4: no
+      dhcp6: no
+  bridges:
+    br0:
+      dhcp4: no
+      dhcp6: no
+      addresses:
+        - 192.168.100.1/29
+      interfaces:
+        - tmfifo_net0
+        - tmfifo_net1
+```
+</details>
 
 For more information on DOCA installation see [DOCA Installation Guide for Linux](https://docs.nvidia.com/doca/sdk/nvidia+doca+installation+guide+for+linux/index.html).
 
@@ -231,26 +277,40 @@ For more information on DOCA installation see [DOCA Installation Guide for Linux
 
 As the lab diagram shows, we will configure one Virtual Function on pf1 to connect to internal network.
 
-Assuming the PCI coordinates are as shown before:
+Using netplan to persist configuration on hosts accross reboots.
 
-```shell
-host# lspci | grep BlueField-3
-e2:00.0 Ethernet controller: Mellanox Technologies MT43244 BlueField-3 integrated ConnectX-7 network controller (rev 01)
-e2:00.1 Ethernet controller: Mellanox Technologies MT43244 BlueField-3 integrated ConnectX-7 network controller (rev 01)
-e2:00.2 DMA controller: Mellanox Technologies MT43244 BlueField-3 SoC Management Interface (rev 01)
+1. Create netplan file
+
+>**NOTE:** The netplan config file assumes that pf1 netdevice name is `enp83s0f1np1` please change as needed.\
+The IP address `192.168.20.41/24` should be adjusted per node. It is provided as example in compliance with the lab diagram.
+
+```bash
+host# cat << EOL > etc/netplan/10-vf-config.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp83s0f1np1:
+      dhcp4: no
+      virtual-function-count: 1
+    enp83s0f1v0:
+      link: enp83s0f1np1
+      dhcp4: no
+      addresses:
+        - 192.168.20.41/24
 ```
-pf1 is at the address `e2:00.1`
 
-Add virtual function:
-```shell
-host# echo 1 | sudo tee /sys/bus/pci/devices/0000\:e2\:00.1/sriov_numvfs
+2. Apply the network configuration and verify config
+```bash
+host# netplan apply
+host# ip -br a show dev enp83s0f1v0
+enp83s0f1v0      UP             192.168.20.41/24 fe80::34ad:f6ff:fedc:df7b/64
 ```
 
-#### Install Kubernetes
+#### Install Kubernetes Prerequisites
 
-Use the following script to install Kubernetes components and requirements.
+Use the following script to install Kubernetes components and prereqs.
 
-Change the `MGMT_NET` variable to use your management network CIDR.
 
 ```bash
 #!/bin/sh
@@ -267,9 +327,6 @@ fi
 K8S_VERSION="1.29"
 CONTAINERD_VERSION="1.7.23"
 RUNC_VERSION="1.2.1"
-# Change this value to the management network CIDR that will include both
-# the host mgmt IP and DPU oob_net0 mgmt IP.
-MGMT_NET="10.144.0.0/16"
 TMP_DIR=$(mktemp -d)
 
 
@@ -348,7 +405,7 @@ EOL
     systemctl enable --now containerd
 }
 
-install_kubernetes() {
+install_kubernetes_components() {
     apt-get update && apt-get install -y apt-transport-https ca-certificates curl gpg
     mkdir -p /etc/apt/keyrings
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v$K8S_VERSION/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
@@ -370,16 +427,6 @@ EOL
     apt-get install -y kubelet kubeadm kubectl
     apt-mark hold kubelet kubeadm kubectl
     systemctl enable --now kubelet
-    kubeadm init --pod-network-cidr=10.244.0.0/16
-    cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-    sleep 30
-    kubectl get node
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
-    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
-    kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD=cidr="$MGMT_NET"
-    sleep 30
-    kubectl get pod --all-namespaces
 }
 
 
@@ -396,7 +443,7 @@ install_runc
 install_containerd
 
 # 4. Install and init Kubernetes
-install_kubernetes
+install_kubernetes_components
 
 popd
 
@@ -406,31 +453,56 @@ rm -rf "$TMP_DIR"
 
 #### Prepare for DPU Install
 
-Download bf-bundle from [Nvidia DOCA download](https://developer.nvidia.com/doca-downloads?deployment_platform=BlueField&deployment_package=BF-Bundle&Distribution=Ubuntu&version=22.04&installer_type=BFB)
+>**Important** These instuctions use `rshim` to install bf bundle and must be performed on all hosts in the cluster that have a DPU attached.
 
-Create `bf.conf` to customize DPU installation as follows:
+1. Create a work directory on the host to prepare for DPU installation
 
-```conf
+```bash
+host# mkdir dpu-install && cd dpu-install
+```
+
+2. Download bf-bundle from [Nvidia DOCA download](https://developer.nvidia.com/doca-downloads?deployment_platform=BlueField&deployment_package=BF-Bundle&Distribution=Ubuntu&version=22.04&installer_type=BFB)
+
+3. Create a file named `bf.conf.template` and add the following content to it.
+
+```bash
 # UPDATE_DPU_OS - Update/Install BlueField Operating System (Default: yes)
 UPDATE_DPU_OS="yes"
- 
-# ubuntu_PASSWORD - Hashed password to be set for "ubuntu" user during BFB installation process.
-# Relevant for Ubuntu BFB only. (Default: is not set)
-# ubuntu_PASSWORD='$1$PtH/5OX9$u0AeOq0qQPg/gfQx7bTDB1'
 
+ubuntu_PASSWORD='{{PASSWORD}}'
 ###############################################################################
 # Other misc configuration
 ###############################################################################
 
 # MAC address of the rshim network interface (tmfifo_net0).
-# NET_RSHIM_MAC=00:1a:ca:ff:ff:06
+NET_RSHIM_MAC={{NET_RSHIM_MAC}}
+
+# bfb_modify_os – SHELL function called after the file system is extracted on the target partitions.
+# It can be used to modify files or create new files on the target file system mounted under
+# /mnt. So the file path should look as follows: /mnt/<expected_path_on_target_OS>. This
+# can be used to run a specific tool from the target OS (remember to add /mnt to the path for
+# the tool).
 
 bfb_modify_os()
 {
     # Set hostname
-    local hname="testlab-dpu"
+    local hname="{{HOSTNAME}}"
     echo ${hname} > /mnt/etc/hostname
     echo "127.0.0.1 ${hname}" >> /mnt/etc/hosts
+
+    # Overwrite the tmfifo_net0 interface to set correct IP address
+    # This is relevant in case of multiple DPU system.
+    cat << EOFNET > /mnt/var/lib/cloud/seed/nocloud-net/network-config
+version: 2
+renderer: NetworkManager
+ethernets:
+  tmfifo_net0:
+    dhcp4: false
+    addresses:
+      - {{IP_ADDRESS}}/{{IP_MASK}}
+  oob_net0:
+    dhcp4: true
+EOFNET
 
     # Modules for kubernetes and DPDK
     cat << EOFMODULES >> /mnt/etc/modules-load.d/custom.conf
@@ -565,23 +637,375 @@ EOFCLOUDINIT
 # }
 ```
 
-To use the custom config and install the DPU bundle use `bfb-install` command
+4. Create script file `create-bf-config.sh` and copy the below script content to it.
+The script will produce custom DPU bf configuration file(s) to be used when installing the bf-bundle. This should work for cases of single and more than 1 DPU on the host.
 
->Note: The command assumes that you downloaded bf bundle file `bf-bundle-2.9.1-30_24.11_ubuntu-22.04_prod.bfb` and both the bundle and the `bf.conf` file are in current directory.
-```shell
-host# bfb-install --rshim rshim0 --bfb bf-bundle-2.9.1-30_24.11_ubuntu-22.04_prod.bfb --config ./bf.conf
+```bash
+#!/bin/bash
+
+generate_config() {
+    local hostname=$1
+    local password=$2
+    local ip_address=$3
+    local ip_mask=$4
+    local output_file=$5
+    local net_rshim_mac=$6
+
+    sed -e "s/{{HOSTNAME}}/${hostname}/g" \
+        -e "s|{{PASSWORD}}|${password}|g" \
+        -e "s/{{IP_ADDRESS}}/${ip_address}/g" \
+        -e "s/{{IP_MASK}}/${ip_mask}/g" \
+        -e "s/{{NET_RSHIM_MAC}}/${net_rshim_mac}/g" \
+        bf.conf.template > "${output_file}"
+}
+
+read -p "Enter the number of DPUs (default: 1): " num_dpus
+num_dpus=${num_dpus:-1}
+read -p "Enter the base hostname (default: dpu): " base_hostname
+base_hostname=${base_hostname:-dpu}
+echo "Enter the Ubuntu password minimum 12 characters (e.g. 'a123456AbCd!'): "
+# Password policy reference: https://docs.nvidia.com/networking/display/bluefielddpuosv490/default+passwords+and+policies#src-3432095135_DefaultPasswordsandPolicies-UbuntuPasswordPolicy
+read -s clear_password
+ubuntu_password=$(openssl passwd -1 "${clear_password}")
+read -p "Enter tmfifo_net IP subnet mask. Useful if you have more than 1 DPU (default: 30): " ip_mask
+ip_mask=${ip_mask:-30}
+
+base_ip=${base_ip:-192.168.100}
+
+for ((i=1; i<=num_dpus; i++)); do
+    hostname="${base_hostname}-${i}"
+    ip_address="${base_ip}.$(( i + 1 ))"
+    net_rshim_mac=00:1a:ca:ff:ff:1${i}
+    output_file="bfb_config_${hostname}.conf"
+
+    echo "Generating configuration for ${hostname} with IP ${ip_address}..."
+    generate_config "${hostname}" "${ubuntu_password}" "${ip_address}" "${ip_mask}" "${output_file}" "${net_rshim_mac}"
+    cat << EOL
+Configuration for ${hostname} is ${output_file}
+To use the config run:
+bfb-install --rshim rshim$(( i - 1 )) --config ${output_file} --bfb <bf-bundle-path>
+EOL
+done
 ```
 
-Wait for the DPU to finish installation. You can check status using
-```shell
-host# cat /dev/rshim0/misc
+5. Ensure the script is executable
+```bash
+host# chmod +x create-bf-config.sh
 ```
 
-### Ready to join DPU to K8S
-TODO:
-- Join DPU to cluster
-- Install Multus
-- Install SR-IOV Device Plugin and configmap
-- Validate installation and kubernetes services
-- jwt token
-- operator and product install
+6. Use the script to generate DPU bf.conf files. For example:
+
+```bash
+host# ./create-bf-config.sh 
+Enter the number of DPUs (default: 1): 
+Enter the base hostname (default: dpu): nvidia-lab-dpu
+Enter the Ubuntu password minimum 12 characters (e.g. 'a123456AbCd!'): 
+Enter tmfifo_net IP subnet mask. Useful if you have more than 1 DPU (default: 30): 
+Generating configuration for nvidia-lab-dpu-1 with IP 192.168.100.2...
+Configuration for nvidia-lab-dpu-1 is bfb_config_nvidia-lab-dpu-1.conf
+To use the config run:
+bfb-install --rshim rshim0 --config bfb_config_nvidia-lab-dpu-1.conf --bfb <bf-bundle-path>
+
+```
+the above produced a bf config file named `bfb_config_nvidia-lab-dpu-1.conf` which we will be using to customize the bf-bundle installation.
+
+At this point the files under `dpu-install` directory should look like the following:
+```bash
+dpu-install
+├── bfb_config_nvidia-lab-dpu-1.conf
+├── bf-bundle-2.9.0-83_24.10_ubuntu-22.04_dev.20241121.bfb
+├── bf.conf.template
+└── create-bf-config.sh
+```
+
+7. Run the `bfb-install` command to install and prepare DPU
+
+```bash
+host# bfb-install --rshim0 --config bfb_config_nvidia-lab-dpu-1.conf --bfb bf-bundle-2.9.0-83_24.10_ubuntu-22.04_dev.20241121.bfb
+```
+
+### Configure Kubernetes Cluster
+
+Now that all Hosts and DPUs prerequisites are completed, we will start Kubernetes configuration
+
+1. Initialize Kubernetes cluster on the **Controller Host** machine as follows:
+
+```bash
+host# cat << EOL > kube-init.sh
+#!/bin/bash
+
+# Change the MGMT_NET variable to the management network CIDR
+# that will include both the host mgmt IP and DPU oob_net0 mgmt IP.
+MGMT_NET="10.144.0.0/16"
+kubeadm init --pod-network-cidr=10.244.0.0/16
+cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+kubectl wait --for=condition=Ready nodes --all --timeout=300s
+kubectl get node
+echo "Installing Calico CNI ..."
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
+kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD=cidr="$MGMT_NET"
+kubectl wait --for=condition=Ready pods --all-namespaces --timeout=300s
+kubectl get pod --all-namespaces
+EOL
+host# chmod +x kube-init.sh && ./kube-init.sh
+```
+
+> NOTE: The Controller Host is now setup to run kubectl. From this point forward any `kubectl` command should be run on the Controller Host.
+
+Copy the `kubeadm join` command. For example:
+
+```bash
+host# kubeadm token create --print-join-command
+kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token-ca-cert-hash sha256:3cdfd53eb85a23a1700f834ca9aa487aa7f455bfdcbadcb8ed470160ce9c2977
+```
+
+2. Join all other Hosts and DPUs
+
+Run the `kubeadm join` command copied from the controller on other Hosts and DPUs.
+
+Hosts example:
+```bash
+host# kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token-ca-cert-hash sha256:3cdfd53eb85a23a1700f834ca9aa487aa7f455bfdcbadcb8ed470160ce9c2977
+```
+
+DPU example:
+```bash
+dpu# kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token-ca-cert-hash sha256:3cdfd53eb85a23a1700f834ca9aa487aa7f455bfdcbadcb8ed470160ce9c2977
+```
+
+3. Install Multus
+```bash
+host# kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
+```
+
+4. Install SR-IOV Device Plugin\
+
+First we create the configmap for SR-IOV Device plugin to find and assign the scalable functions that were created as part of the DPU installation.\
+Create a file named `sriov-configmap.yaml` with the following content:
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sriovdp-config
+  namespace: kube-system
+data:
+  config.json: |
+    {
+        "resourceList": [
+            {
+                 "resourceName": "bf3_p0_sf",
+                  "resourcePrefix": "nvidia.com",
+                  "deviceType": "auxNetDevice",
+                  "selectors": [{
+                      "vendors": ["15b3"],
+                      "devices": ["a2dc"],
+                      "pciAddresses": ["0000:03:00.0"],
+                      "pfNames": ["p0#1"],
+                      "auxTypes": ["sf"]
+                  }]
+              },
+              {
+                 "resourceName": "bf3_p1_sf",
+                  "resourcePrefix": "nvidia.com",
+                  "deviceType": "auxNetDevice",
+                  "selectors": [{
+                      "vendors": ["15b3"],
+                      "devices": ["a2dc"],
+                      "pciAddresses": ["0000:03:00.1"],
+                      "pfNames": ["p1#1"],
+                      "auxTypes": ["sf"]
+                  }]
+              }
+        ]
+    }
+```
+Then apply the configmap:
+```bash
+host# kubectl apply -f sriov-configmap.yaml
+```
+
+And install the SR-IOV Device Plugin
+
+```bash
+host# kubectl apply -f https://raw.github.com/k8snetworkplumbingwg/sriov-network-device-plugin/master/deployments/sriovdp-daemonset.yaml
+host# kubectl patch daemonset kube-sriov-device-plugin -n kube-system --type='json' -p='[{"op": "add", "path": "/spec/template/spec/tolerations", "value": [{"effect": "NoSchedule", "operator": "Exists"}]}]'
+```
+
+5. Install Cert Manager
+```bash
+host# helm repo add jetstack https://charts.jetstack.io --force-update
+host# helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.16.1 --set crds.enabled=true --set featureGates=ServerSideApply=true
+```
+Configure self-signing issuer for cert-manager by applying the following file
+
+```yaml
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: selfsigned-cluster-issuer
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: bnk-ca
+    namespace: cert-manager
+spec:
+    isCA: true
+    commonName: bnk-ca
+    secretName: bnk-ca
+    issuerRef:
+        name: selfsigned-cluster-issuer
+        kind: ClusterIssuer
+        group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: bnk-ca-cluster-issuer
+spec:
+  ca:
+    secretName: bnk-ca
+```
+6. Install Gateway API CRDs
+
+BIG-IP Next for Kubernetes acts as Kubernetes Gateway API controller.
+
+```bash
+host# kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/experimental-install.yaml
+```
+
+
+
+
+### Install BIG-IP Next for Kubernetes
+
+The Kubernetes cluster is now ready for BIG-IP Next for Kubernetes installation.
+
+1. Create required namespace
+
+There are two main Kubernetes namespaces categories we use in this guide; Product, and Tenant namespaces.
+
+**Product Namespaces**\
+For the purposes of this lab guide, the BIG-IP Next for Kubernetes product will use 2 namespaces
+  - **f5-utils:** All shared components for BIG-IP Next installation will use this namespace.
+  - **default:** Operator, BIG-IP Next control plane, and BIG-IP Next Dataplane components will use this namespace.
+
+**Tenant Namespaces**\
+These are namespaces used for Tenant workload. At the moment these namespaces must exist prior to install. In future releases that may not be required.\
+In this guide we will have two Tenant namespaces, `red` and `blue`.
+
+Create required namespaces:
+```bash
+host# for ns in f5-utils red blue; do kubectl create ns $ns; done
+```
+
+
+2. Download and extract the auth key to F5 Artifactory Repository (FAR) where all software will be installed from
+   - Login to the [MyF5](https://my.f5.com/).
+   - Navigate to Resources and click Downloads.
+   - Click checkbox to accept the End User License Agreement and Program Terms, then click Next.
+   - Choose BIG-IP_Next from the Select a Product Family Group drop-down.
+   - Select BIG-IP Next for Kubernetes from the Product Line drop-down.
+   - Choose `1.9.2` from the Product Version drop-down menu.
+   - Select the `f5-far-auth-key.tgz` file from the download file list.
+   - Choose a location from the `Download location` drop-down menu and click Download.
+   - The `f5-far-auth-key.tgz` file contains a Service Account Key that is in base64 format and used for logging into FAR.
+   - `tar zxvf f5-far-auth-key.tgz` will expand file named `cne_pull_64.json`
+
+3. Login to FAR helm registery using the auth key
+```bash
+host# cat cne_pull_64.json | helm registry login -u _json_key_base64 --password-stdin https://repo.f5.com
+```
+4. Create Kubernetes Pull Secret
+
+Use the following script to create pull secret from the file `cne_pull_64.json` in both `default` and `f5-utils` namespaces.
+```bash
+#!/bin/bash
+
+# Read the content of pipeline.json into the SERVICE_ACCOUNT_KEY variable
+SERVICE_ACCOUNT_KEY=$(cat cne_pull_64.json)
+# Create the SERVICE_ACCOUNT_K8S_SECRET variable by appending "_json_key_base64:" to the base64 encoded SERVICE_ACCOUNT_KEY
+SERVICE_ACCOUNT_K8S_SECRET=$(echo "_json_key_base64:${SERVICE_ACCOUNT_KEY}" | base64 -w 0)
+# Create the secret.yaml file with the provided content
+cat << EOF > far-secret.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: far-secret
+data:
+  .dockerconfigjson: $(echo "{\"auths\": {\
+\"repo.f5.com\":\
+{\"auth\": \"$SERVICE_ACCOUNT_K8S_SECRET\"}}}" | base64 -w 0)
+type: kubernetes.io/dockerconfigjson
+EOF
+
+kubectl -n f5-utils apply -f far-secret.yaml
+kubectl -n default apply -f far-secret.yaml
+```
+
+5. Cluster Wide Controller requirements
+
+The Cluster Wide Controller (CWC) component manages license registeration and debug API. In this release there are some manual requirements that are needed. Follow [F5 guide](https://clouddocs.f5.com/bigip-next-for-kubernetes/2.0.0-LA/cwc-certificate.html) to generate and install required certificates and ConfigMap.
+
+6. Download and copy Scalable Function CNI Binary
+
+F5 created a CNI binary used here to move Scalable Function netdevice and RDMA devices inside of the dataplane container. This CNI is invoked by Multus delegation when attaching the Dataplane component to defined networks.
+
+```bash
+host# helm pull oci://repo.f5.com/utils/f5-eowyn  --version 2.0.0-LA.1-0.0.11
+host# tar zxvf f5-eowyn-2.0.0-LA.1-0.0.11.tgz 
+f5-eowyn/
+f5-eowyn/sf
+f5-eowyn/Chart.yaml
+```
+The `sf` CNI must be copied to all DPU nodes in the `/opt/cni/bin/` directory. For example:
+
+```bash
+host# scp f5-eowyn/sf root@<dpu-ip>:/opt/cni/bin/
+```
+
+7. Configure Network Attachment Definitions
+
+Now that the CNI binary is installed we can configure Multus Network Attachment Definitions based on the configuration used in SR-IOV Device Plugin ConfigMap and using the `sf` CNI.\
+Apply the following configuration to the default namespace.
+```yaml
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sf-external
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: nvidia.com/bf3_p0_sf
+spec:
+  config: '{
+  "type": "sf",
+  "cniVersion": "0.3.1",
+  "name": "sf-external",
+  "ipam": {},
+  "logLevel": "debug",
+  "logFile": "/var/log/sf/sf-external.log"
+}'
+
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sf-internal
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: nvidia.com/bf3_p1_sf
+spec:
+  config: '{
+  "type": "sf",
+  "cniVersion": "0.3.1",
+  "name": "sf-internal",
+  "ipam": {},
+  "logLevel": "debug",
+  "logFile": "/var/log/sf/sf-internal.log"
+}'
+```
+Which will create two network attachments for internal and external scalable functions.
