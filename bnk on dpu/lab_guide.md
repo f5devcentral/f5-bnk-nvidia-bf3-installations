@@ -22,6 +22,8 @@
       - [Prepare for DPU Install](#prepare-for-dpu-install)
     - [Configure Kubernetes Cluster](#configure-kubernetes-cluster)
     - [Install BIG-IP Next for Kubernetes](#install-big-ip-next-for-kubernetes)
+    - [Configure BIG-IP Next for Kubernetes](#configure-big-ip-next-for-kubernetes)
+    - [TODO](#todo)
 
 ## Introduction
 
@@ -951,7 +953,194 @@ kubectl -n default apply -f far-secret.yaml
 
 5. Cluster Wide Controller requirements
 
-The Cluster Wide Controller (CWC) component manages license registeration and debug API. In this release there are some manual requirements that are needed. Follow [F5 guide](https://clouddocs.f5.com/bigip-next-for-kubernetes/2.0.0-LA/cwc-certificate.html) to generate and install required certificates and ConfigMap.
+The Cluster Wide Controller (CWC) component manages license registeration and debug API. In this release there are some manual requirements that are needed. The steps also can be found in [F5 guide](https://clouddocs.f5.com/bigip-next-for-kubernetes/2.0.0-LA/cwc-certificate.html) to generate and install required certificates and ConfigMap.
+
+Generate certificates that will be used to communicate with CWC component API, by pulling the script from F5 repo then generating certs for the f5-utils namespace service as follows.
+
+5.1. Pull and extract the chart containing cert generation scripts
+```bash
+host# helm pull oci://repo.f5.com/utils/f5-cert-gen --version 0.9.1
+Pulled: repo.f5.com/utils/f5-cert-gen:0.9.1
+Digest: sha256:89d283a7b2fef651a29baf1172c590d45fbd1e522fa90207ecd73d440708ad34
+
+host# tar zxvf f5-cert-gen-0.9.1.tgz 
+cert-gen/
+cert-gen/LICENSE
+cert-gen/README.md
+cert-gen/tls_gen/
+cert-gen/tls_gen/tls-gen.md
+cert-gen/tls_gen/__pycache__/
+cert-gen/tls_gen/__pycache__/cli.cpython-39.pyc
+cert-gen/tls_gen/__pycache__/info.cpython-39.pyc
+cert-gen/tls_gen/__pycache__/__init__.cpython-39.pyc
+cert-gen/tls_gen/__pycache__/verify.cpython-39.pyc
+cert-gen/tls_gen/__pycache__/paths.cpython-39.pyc
+cert-gen/tls_gen/__pycache__/extension_gen.cpython-39.pyc
+cert-gen/tls_gen/__pycache__/gen.cpython-39.pyc
+cert-gen/tls_gen/cli.py
+cert-gen/tls_gen/extension_gen.py
+cert-gen/tls_gen/__init__.py
+cert-gen/tls_gen/paths.py
+cert-gen/tls_gen/info.py
+cert-gen/tls_gen/verify.py
+cert-gen/tls_gen/gen.py
+cert-gen/gen_cert.sh
+cert-gen/Chart.yaml
+cert-gen/openssl-cert-gen/
+cert-gen/openssl-cert-gen/client-cert.conf
+cert-gen/openssl-cert-gen/README.md
+cert-gen/openssl-cert-gen/csr.conf
+cert-gen/openssl-cert-gen/client-csr.conf
+cert-gen/openssl-cert-gen/server-cert.conf
+cert-gen/openssl-cert-gen/gen-yaml.sh
+cert-gen/openssl-cert-gen/gen-certs.sh
+cert-gen/basic/
+cert-gen/basic/profile.py
+cert-gen/basic/.DS_Store
+cert-gen/basic/openssl.cnf
+cert-gen/basic/grpc/
+cert-gen/basic/grpc/grpc-service.ext
+cert-gen/basic/grpc/validation-service.ext
+cert-gen/basic/grpc/f5-fqdn-resolver.ext
+cert-gen/basic/grpc/client.ext
+cert-gen/basic/grpc/grpc.mk
+cert-gen/basic/CertificateGenerator.md
+cert-gen/basic/Makefile
+cert-gen/common.mk
+```
+5.2. Generate the API self-signed certificates. At the end of this step the script would have generated to main secret files Generating `cwc-license-certs.yaml` and `cwc-license-client-certs.yaml`
+
+```bash
+host# sh cert-gen/gen_cert.sh -s=api-server -a=f5-spk-cwc.f5-utils -n=1
+------------------------------------------------------------------
+Service                   = api-server
+Subject Alternate Name    = f5-spk-cwc.f5-utils
+Working directory         = /root/bnk-dpu-install/api-server-secrets
+------------------------------------------------------------------
+rm: cannot remove '/root/bnk-dpu-install/api-server-secrets': No such file or directory
+Generating Secrets ...
+python3 profile.py regenerate --password "" \
+--common-name f5net \
+--client-alt-name client \
+--server-alt-name f5-spk-cwc.f5-utils \
+--days-of-validity 3650 \
+--client-certs 1 \
+--key-bits 2048 
+Creating 1 client extensions...
+Will generate a root CA and two certificate/key pairs (server and client)
+=>	[openssl_req]
+.+.......+.....+.............+..+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*...............+.+..+....+..............+......+...+.+..+.......+.....+...+.......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..............+...+.....+.+..+............+.......+...........+.........+.+............+..................+.....+....+.........+.....+.+...+.....+.+.........+...........+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..+..........+...........+.+.....+.+.....+....+......+.....+....+...+......+..+.......+..+..........+........+...+............+.......+.........+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+=>	[openssl_x509]
+Will generate leaf certificate and key pair for server
+Using f5net for Common Name (CN)
+Using parent certificate path at /root/bnk-dpu-install/cert-gen/basic/testca/cacert.pem
+Using parent key path at /root/bnk-dpu-install/cert-gen/basic/testca/private/cakey.pem
+Will use RSA...
+=>	[openssl_genpkey]
+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*....+.........+..+......+............+.+..+....+........+.+.....+......+.........+.+......+..+...+.......+........+...+.......+.....+.......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..........+...+...+..................+......+.+...............+..+......+.+......+..+......+.+.....+.+.....+.........+....+.........+..+....+..+...+.........+...+..................+............+....+......+.....+...+....+........+...+.......+...+...........+...+.+......+......+.........+.....+.+..+.............+..+......+......+......+....+......+...+..+..........+..+..........+.....+.+..+...+....+...+.....+....+.........+.....+......+....+...........+...+..........+...+.....+.........+.+.........+........+..........+...............+............+.....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+.........+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+...................+......+..+.+.....+.....................+...+..........+..+.........+....+...+..+...+...............+.......+........+...+.+.....+.........+.+.....+.+.........+...+.....+......+....+...+........+.....................+...+...+.............+.....+....+..+...+.+.....+...............+......+.+............+...+........+......+...+.+...........................+..............+...............+.+..+.+......+........+...+....+.....+.+..............+...+...+.............+.....+.+...+...+........+....+...+...+.....+......+...+......+.+...+..+......+...+.+.....+.+.....+........................+.........+.+......+..+.+..+.......+...+..+.......+.........+..+....+...............+...+........+............+.......+...+.....+...+.......+........+........................+.+........+.+.....+.+..+.......+......+..............+.+..+..........+...............+...+............+..+...+.......+......+...+..+.........+......+.............+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+=>	[openssl_req]
+-----
+=>	[openssl_ca]
+Using configuration from /tmp/tmpnso_b2s4
+801B7E13897F0000:error:0700006C:configuration file routines:NCONF_get_string:no value:../crypto/conf/conf_lib.c:315:group=<NULL> name=unique_subject
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'f5net'
+organizationName      :ASN.1 12:'server'
+localityName          :ASN.1 12:'$$$$'
+Certificate is to be certified until Jan  5 18:51:43 2035 GMT (3650 days)
+
+Write out database with 1 new entries
+Data Base Updated
+=>	[openssl_pkcs12]
+Will generate leaf certificate and key pair for client
+Using f5net for Common Name (CN)
+Using parent certificate path at /root/bnk-dpu-install/cert-gen/basic/testca/cacert.pem
+Using parent key path at /root/bnk-dpu-install/cert-gen/basic/testca/private/cakey.pem
+Will use RSA...
+=>	[openssl_genpkey]
+......+.+......+...+..+....+...+..+...+...+...+...............+............+............+.+.........+...+........+....+...........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.....+.+........+......+....+......+.....+.+.....+...+....+...........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.....+.+..+..........+..+.......+.........+......+.....+....+.....+.........+..........+..+.+........+..........+..+.........+....+..+...+.......+........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.............+.........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+.........+.+...........+.+...+.....+.......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*......+.......+..+..........+.........+.....+.......+.........+.....................+..+...+....+...+...+.....+.........+....+............+...+..............+......+.......+.....+...+.....................+.+..+......+.+....................+.+...+..+...............+...............+...+.+...+...........+.+...+......+......+......+..+............+...+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+=>	[openssl_req]
+-----
+=>	[openssl_ca]
+Using configuration from /tmp/tmpnso_b2s4
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'f5net'
+organizationName      :ASN.1 12:'client'
+localityName          :ASN.1 12:'$$$$'
+Certificate is to be certified until Jan  5 18:51:44 2035 GMT (3650 days)
+
+Write out database with 1 new entries
+Data Base Updated
+=>	[openssl_pkcs12]
+Done! Find generated certificates and private keys under ./result!
+python3 profile.py verify --client-certs 1 
+Will verify generated server certificate against the CA...
+Will verify server certificate against root CA
+/root/bnk-dpu-install/cert-gen/basic/result/server_certificate.pem: OK
+Will verify generated client certificate against the CA...
+Will verify client certificate against root CA
+/root/bnk-dpu-install/cert-gen/basic/result/client_certificate.pem: OK
+Copying secrets ...
+Generating /root/bnk-dpu-install/cwc-license-certs.yaml
+Generating /root/bnk-dpu-install/cwc-license-client-certs.yaml
+
+```
+
+5.3. Install secrets.
+```bash
+host# kubectl apply -f cwc-license-certs.yaml -n f5-utils
+host# kubectl apply -f cwc-license-client-certs.yaml -n f5-utils
+```
+
+5.4. Install qkview config map file.
+```bash
+host# cat << EOF | kubectl -n f5-utils apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+   name: cwc-qkview-cm
+EOF
+```
+
+5.4. Install Json Key Set for license activation
+
+```bash
+host# cat << EOF | kubectl -n f5-utils apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cpcl-key-cm
+  namespace: f5-utils
+data:
+  jwt.key: |
+    {
+        "keys": [
+            {
+                "kid": "v1",
+                "alg": "RS512",
+                "kty": "RSA",
+                "n": "26FcA1269RC6WNgRghIB7X772zTTts02NsqqN-_keSz5FVq1Ekg151NFu_53Tgz1FGsUiX4OUj-fOmuhK9uzkQv0zYZgXY6zmRo_9P-QgiycuFo7DWquDwEx4rZiMxXwlA9ER56s8PDdbXyfi3ceMV-aUQZFqMiU6gOTl5d7uMfskocPF4ja8ZRrLlXAzzRIR62VgbQa-3sT0_SZ4w1ME4eLzO1yb-Ex9va4JnwToVLSKfsZp6jYs9nvAGjZ8aN2_lzBx8uiZ1HQozGqcf0AEjU-FEY73Umvmyvzd4woQLQlbvyrRtL9_IkL2ySdQ9Znh2lXBdsmA9cLz4ZAYPdmvcjsyBaZmh15EOkczpVVan1_VVD4o28uLDpzQVDk_GNUYoZIRsuOzuKvzih0gkv-StH29umHbdKXrUhlMWM1zyaxz8gkHatn-g5uh70WwVwqPtfHaNrQ0fFiWoyGVOA_-XqsJWA9NLJorewp9HOVlyF8qzu5s9cFO4UGQas0fF2QR9QvhgCymK7iWbEFF3PXqUQTLfFsITgix3mmeXVYC3ODsPKvcFhNBqQxmeXM04N2XMLluz2qp581NUJygWAAfq7la0ylDJ1MtefyESD8SBs1at2a8kSEBJCdCtAuNX2q33JjxQP3AiGvHcKEAjd1uaNeSgdHC93BzT3u0gbh2Ok",
+                "e": "AQAB",
+                "x5c": [
+                    "MIIFqDCCBJCgAwIBAgIRAK+LbrS2gkaJSeoUQpMK0LswDQYJKoZIhvcNAQELBQAwgacxCzAJBgNVBAYTAlVTMRMwEQYDVQQIDApXYXNoaW5ndG9uMRowGAYDVQQKDBFGNSBOZXR3b3JrcywgSW5jLjEeMBwGA1UECwwVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MTUwMwYDVQQDDCxGNSBTVEcgSXNzdWluZyBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgVEVFTSBWMTEQMA4GA1UEBwwHU2VhdHRsZTAeFw0yMTEwMTEyMzI0NTFaFw0yNjEwMTEwMDI0NTFaMIGBMQswCQYDVQQGEwJVUzETMBEGA1UECAwKV2FzaGluZ3RvbjEQMA4GA1UEBwwHU2VhdHRsZTEaMBgGA1UECgwRRjUgTmV0d29ya3MsIEluYy4xDTALBgNVBAsMBFRFRU0xIDAeBgNVBAMMF0Y1IFNURyBURUVNIEpXVCBBdXRoIHYxMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA26FcA1269RC6WNgRghIB7X772zTTts02NsqqN+/keSz5FVq1Ekg151NFu/53Tgz1FGsUiX4OUj+fOmuhK9uzkQv0zYZgXY6zmRo/9P+QgiycuFo7DWquDwEx4rZiMxXwlA9ER56s8PDdbXyfi3ceMV+aUQZFqMiU6gOTl5d7uMfskocPF4ja8ZRrLlXAzzRIR62VgbQa+3sT0/SZ4w1ME4eLzO1yb+Ex9va4JnwToVLSKfsZp6jYs9nvAGjZ8aN2/lzBx8uiZ1HQozGqcf0AEjU+FEY73Umvmyvzd4woQLQlbvyrRtL9/IkL2ySdQ9Znh2lXBdsmA9cLz4ZAYPdmvcjsyBaZmh15EOkczpVVan1/VVD4o28uLDpzQVDk/GNUYoZIRsuOzuKvzih0gkv+StH29umHbdKXrUhlMWM1zyaxz8gkHatn+g5uh70WwVwqPtfHaNrQ0fFiWoyGVOA/+XqsJWA9NLJorewp9HOVlyF8qzu5s9cFO4UGQas0fF2QR9QvhgCymK7iWbEFF3PXqUQTLfFsITgix3mmeXVYC3ODsPKvcFhNBqQxmeXM04N2XMLluz2qp581NUJygWAAfq7la0ylDJ1MtefyESD8SBs1at2a8kSEBJCdCtAuNX2q33JjxQP3AiGvHcKEAjd1uaNeSgdHC93BzT3u0gbh2OkCAwEAAaOB8jCB7zAJBgNVHRMEAjAAMB8GA1UdIwQYMBaAFLDdK33QD9FdLnrVFw+ZAkQUayxCMB0GA1UdDgQWBBQw/hNgf2AoJAF086NV7JGQj+B2NzAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMHMGA1UdHwRsMGowaKBmoGSGYmh0dHA6Ly9jcmwtdGVlbS1zdGctb3JlLWY1LnMzLnVzLXdlc3QtMi5hbWF6b25hd3MuY29tL2NybC85ZGFmNGVlNy1iOGNkLTRiODEtOWE0MC00YjU3MGY0N2VhYWUuY3JsMA0GCSqGSIb3DQEBCwUAA4IBAQApzkSnsfuNSMHxVmL78pOQ+Rxkz1uYSVT0k1W45iufVmP0ixd8hFPcfb8u1RoHZ/58Gl52JPCudAB2sc4k/lHNT9cKL4w5F8LybB8uNJXikAqzu4HFobRYMiPtVQ7M8cFz5SgvGclxzBAbZzK5u5xZuGSkI6tG9l+D5JhW2LesRuQSBQniBgRhmtAJB7SXuZ2sNKsq04h7DWcpdjCSferymeCOLQcgy5F3ragKML8zyuNeKqtvZnUzJElKoU8G+Oo7MQXO7P5n6HX0NLfqqisv8CfSJUZTa1IRcfFUDJrcHtCgzingalzLLKzyelqR+YeY+j21jwVdnDVZIkFid2He",
+                    "MIIFDjCCAvagAwIBAgIBBTANBgkqhkiG9w0BAQsFADCBhDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAldBMRgwFgYDVQQKEw9GNSBOZXR3b3JrcyBJbmMxHjAcBgNVBAsTFUNlcnRpZmljYXRlIEF1dGhvcml0eTEuMCwGA1UEAxMlRjUgSW50ZXJtZWRpYXRlIENlcnRpZmljYXRlIEF1dGhvcml0eTAeFw0xODEyMTMxOTU3NDlaFw0yODEyMTAxOTU3NDlaMIGnMQswCQYDVQQGEwJVUzETMBEGA1UECAwKV2FzaGluZ3RvbjEaMBgGA1UECgwRRjUgTmV0d29ya3MsIEluYy4xHjAcBgNVBAsMFUNlcnRpZmljYXRlIEF1dGhvcml0eTE1MDMGA1UEAwwsRjUgU1RHIElzc3VpbmcgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IFRFRU0gVjExEDAOBgNVBAcMB1NlYXR0bGUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC1zQVzFAkzJdDMk+blcmQ506+GhWZOoe32rSWpkztdH7nYHtE6ITx44nHErRLOXXcYsf8nQZyV2RiE5Gyxwvdg3ClC9XqfT702FxFWLPpD/I53cRZasYH3dFfdvDztEOlTsUrMfo7Bzfh7ZMaMkBczHno0DdP61lp6pfzsQRLSfdaWxLKkCxc3P2xDUyx9F7uX3lXsT042OuiZpoCrMumO53hmvw6ZtP6mH7d6dM7nhYhTIGxRMYrzEAHKl+JM0Jnaabwxw4UBMkxozxP+kLvDXrwLADjMslEuVeq1r7WwNa33y8aXfBUZpDCgJKfYvvPQIUD5d6ui0v7vwAQRgX/fAgMBAAGjZjBkMB0GA1UdDgQWBBSw3St90A/RXS561RcPmQJEFGssQjAfBgNVHSMEGDAWgBRz1uVFvQMN0SWZ8zjGfQLZ+vrt6TASBgNVHRMBAf8ECDAGAQH/AgEBMA4GA1UdDwEB/wQEAwIBhjANBgkqhkiG9w0BAQsFAAOCAgEABB8ygsfvpId2OPMh3jnTtEpfcJy80yu7vFVSMDQ/4xKTBSR0iFcCNmMJ8i4PL0E8RqFzcsUaG9Rq2uyiW71Y/+QiC0/xN8pXTua9zH1aYPLKTa62IB5Dnfax+QccNCehCAoJ/W4yVeY9/nHbSlYt8+eOMSdUJf/hcaPuHbLs6rJI9GHo9CNeBtWH0q+Xw3rRAXSrNXMg+CRE55JOVaDdzRUOEdf962Pd/MRN7+Sypyj2dR9rCJ/SKxf0HQr6NOGSAc3QbLun0bzew/0Nlww8UpCXV/ABiBFUBDvIhapMQqoErMuPm0CvqBdVCWafOa8qylHHOCkEUxTlxtk3WTwEI4RcrHnHVO4eIkstLe8+4HvKvCwXwoDlcms44lIzQpoPvVclkYYKH0d9GjY1dDSXxYeIm7aPeA6VutQoTd8ozKqZFjueESJB7JATC1q5PSiOhNIUr1d9Y7CbTpLWAl7ktJt5yZlcJBd3+5wztuCtwfQncjERRl8Sey3UuCjD836E7d4ZPldKUaJpDKpdzXIiiwDWCTL3G1iPBz+O1YyPAoQz6NFUsiHDnuIaGMfYLouf0ltuHTBwzcQbkFtH7PeY5Qwts617AQBy5lCJ3HLdJ9Hg3CwTXlBqFR+T/8vF0n6+AuE0ZFjmbJYJs0m4EObk0IOcex4ft33fPDEFWRJpHIs=",
+                    "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",
+                    "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"
+                ],
+                "use": "sig"
+            }
+        ]
+    }
+EOF
+```
 
 6. Download and copy Scalable Function CNI Binary
 
@@ -1008,4 +1197,354 @@ spec:
   "logFile": "/var/log/sf/sf-internal.log"
 }'
 ```
-Which will create two network attachments for internal and external scalable functions.
+Which will create two network attachments for internal and external scalable functions as described in the lab diagram.
+
+8. Install BIG-IP Next for Kubernetes Operator in default namespace
+
+```bash
+host# helm install orchestrator oci://repo.f5.com/charts/orchestrator \
+        --version v0.0.25-0.0.96 \
+        --set global.imagePullSecrets[0].name=far-secret \
+        --set image.repository=repo.f5.com/images \
+        --set image.pullPolicy=Always
+```
+
+The operator helps in installing BIG-IP Next for Kubernetes software. It requires two Custom Resources to be defined for the installation.\
+**`SPKInfrastructure`** to describe dataplane infrastructure connections and settings AND\
+**`SPKInstance`** Declared state and configuration of the BIG-IP Next for Kubernetes components
+
+9. Apply the `SPKInfrastructure` resource, which will include refernces to the Network Attachment Definitions created earlier, and the resources provisioned for these networks as configured in the SR-IOV device plugin section.\
+
+```bash
+host# cat << EOF | kubectl apply -f -
+apiVersion: charts.k8s.f5net.com/v1alpha1
+kind: SPKInfrastructure
+metadata:
+  name: bnk-dpu-infra
+spec:
+  networkAttachment:
+  - name: default/sf-external
+  - name: default/sf-internal
+  platformType: other
+  hugepages: true
+  sriovResources:
+    nvidia.com/bf3_p0_sf: "1"
+    nvidia.com/bf3_p1_sf: "1"
+  wholeClusterMode: "enabled"
+  calicoRouter: "default"
+  egress:
+    json:
+      ipPoolCidrInfo:
+        ipPoolList:
+        - name: pod_cidr_ipv4
+          value: "10.244.0.0/16"
+EOF
+```
+10. Add taint and label to all DPU nodes where the dataplane daemonset should be deployed.
+```bash
+# Do the following for all DPU nodes replace <dpu-node-name> with appropriate worker node name.
+host# kubectl taint node <dpu-node-name> dpu=true:NoSchedule
+host# kubectl label node <dpu-node-name> app=f5-tmm
+```
+
+11. Apply the `SPKInstance` which will install the product components.
+>_**NOTE:**_ This SPKInstance CR also includes JWT license token valid through December 2025. Intended for Nvidia use only, please do not share.
+
+The `SPKInstance` configured here will start
+
+```bash
+host# cat << EOF | kubectl apply -f -
+apiVersion: charts.k8s.f5net.com/v1alpha1
+kind: SPKInstance
+metadata:
+  name: bnk-dpu
+  namespace: default
+spec:
+  controller:
+    watchNamespace: red, blue
+  cwc:
+    cpclConfig:
+      jwt: eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImtpZCI6InYxIiwiamt1IjoiaHR0cHM6Ly9wcm9kdWN0LXRzdC5hcGlzLmY1bmV0d29ya3MubmV0L2VlL3YxL2tleXMvandrcyJ9.eyJzdWIiOiJUU1QtZGVmNTg1NmItN2UwOC00MDhlLTlhZWYtMGZjNGJjMmVkMTk4IiwiaWF0IjoxNzM2MTg0NDY5LCJpc3MiOiJGNSBJbmMuIiwiYXVkIjoidXJuOmY1OnRlZW0iLCJqdGkiOiI4ZDFjOWZmMS1jYzUzLTExZWYtYWQ4Yy00ZjQ0MDFkZDUxOWEiLCJmNV9vcmRlcl90eXBlIjoicGFpZCIsImY1X3NhdCI6MTc2NDU0NzIwMH0.JdhZeVjhvZL5seVnNM3vDDOGRMzgcs08EV7sahulQPbaLAkAvJc94I-n_rjQUZtASi5zOk8qBDoXzdhRwa6LCefQu5fE1dFFVykzJ6FWfY2HvF8fRdDPa-kvV9O5Y9prhNNM1g9C4lN3IneK1w3KkH6ZPuhEAQmcS4sEkTVsVa2m174Br8RxHRYJAqX3-E-ZjEU7LCrQrLIce-8zll6tM1dDwGNpA71OqP_XLsereCsRtRLQYNbiqhMz8d80pItkkdvvaIfm3S18l4K3O-czp4VoT6IbJPprS3gq3lFKTWdZ1kdSCUvRYtAT8AQpzSIc_ZNL66aP8GqqsQgsSM8H880NMoCo0tZZXCmnE1fO78nuflKtBVfyOae5j3vGzYSWRqXZGVihp3Kaefmo04mVIOtfc0fyDEzn40mGJil5rwoCp1s2HkLqMX8kMMjGSxBICMrtuluGcA4oAZ8ds6Y_BwLaq39nv2BFrx6YNYjeY93A-7LyBMuriKF3oE3qjlwIxb8dTdyZ8JZRvh52PMVga3PimLYXVQlGU7m7PjwuOJt_8PP7MPk-EsnuvpqcTRt1ezccosyXDLFG527jUucGVMtODK7Jmba1RDL4kSqw03JLsd5djiI_IZMJ8TTO3txfEz21C3Nu22LfzCshmVYpkVHOdcbKj0PcpkiFmzYZ_YQ
+      operationMode: connected
+  global:
+    certmgr:
+      issuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: bnk-ca-cluster-issuer
+    imagePullSecrets:
+    - name: far-secret
+    imageRepository: repo.f5.com/images
+    logging:
+      fluentbitSidecar:
+        fluentd:
+          port: "54321"
+  spkInfrastructure: bnk-dpu-infra
+  spkManifest: unused
+  afm:
+    enabled: true
+    pccd:
+      enabled: true
+      blob:
+        maxFwBlobSizeMb: "512"
+        maxNatBlobSizeMb: "512"
+  tmm:
+    replicaCount: 1
+    nodeAssign:
+      nodeSelector:
+        app: f5-tmm
+      tolerations:
+        - key: "dpu"
+          value: "true"
+          operator: "Equal"
+    palCPUSet: "8-15"
+    usePhysMem: true
+    tmmMapresHugepages: 6144
+    resources:
+      limits:
+        cpu: "8"
+        hugepages-2Mi: 13Gi 
+        memory: 2Gi
+    debug:
+      enabled: true
+      resources:
+        limits:
+          cpu: 200m
+          memory: 100Mi
+        requests:
+          cpu: 200m
+          memory: 100Mi
+    xnetDPDKAllow:
+    - auxiliary:mlx5_core.sf.4,dv_flow_en=2
+    - auxiliary:mlx5_core.sf.5,dv_flow_en=2
+    blobd:
+      enabled: true
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+    dynamicRouting:
+      enabled: false
+      configMapName: spk-bgp
+    tmrouted:
+      resources:
+        limits:
+          cpu: "300m"
+          memory: "512Mi"
+        requests:
+          cpu: "300m"
+          memory: "512Mi"
+    tmmRouting:
+      resources:
+        limits:
+          cpu: "700m"
+          memory: "512Mi"
+        requests:
+          cpu: "700m"
+          memory: "512Mi"
+    sessiondb:
+      useExternalStorage: "true"
+EOF
+```
+
+Ensure that all pods in default and f5-utils namespaces are healthy. This can take up to 5 minutes.
+
+### Configure BIG-IP Next for Kubernetes
+
+BIG-IP Next for Kubernetes dataplane componenet (TMM) configures and performs all it's networking stack tasks in user-space and attaches to Scalable Functions interfaces using DPDK driver.\
+TMM network is configured through Custom Resources and we will use some of them to configure the installation in accordance with the lab guide diagram.
+
+
+1. Configure underlay network.
+
+These are the IP addresses directly connected to the network segments/infrastructure. To configure underlay addresses we use the `F5SPKVlan` Custom Resource.
+
+The `F5SPKVlan` resources below configure two _untagged_ VLANs **internal** connected to the internal network segment and **external** connected to the external network segment.\
+The IP address lists for IPv4 and IPv6 are the underlay IP addresses that will be reachable through these network segments. Since we have 3 DPU nodes we need at least 3 IP addresses in the list where one of them will be assigned to each TMM.
+
+>NOTE: `tag: 0` means untagged VLAN. Change that value to a VLAN tag if needed.
+
+>NOTE: Only one *untagged* VLAN is allowed per interface. And multiple *tagged* VLANs are allowed per interface. All configured tagged VLANs on all interfaces must have unique tag value, i.e. one can not use the same VLAN tag on two different interfaces.
+
+```bash
+host# cat << EOF | kubectl apply -f -
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKVlan
+metadata:
+  name: internal
+spec:
+  name: internal
+  interfaces:
+    - "1.2"
+  tag: 0
+  selfip_v4s:
+    - 192.168.20.201
+    - 192.168.20.202
+    - 192.168.20.203
+  prefixlen_v4: 24
+  selfip_v6s:
+    - 2001::192:168:20:201
+    - 2001::192:168:20:202
+    - 2001::192:168:20:203
+  prefixlen_v6: 112
+  auto_lasthop: "AUTO_LASTHOP_ENABLED"
+  internal: true
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKVlan
+metadata:
+  name: external
+spec:
+  name:  external
+  interfaces:
+    - "1.1"
+  tag: 0
+  selfip_v4s:
+    - 192.168.10.201
+    - 192.168.10.202
+    - 192.168.10.203
+  prefixlen_v4: 24
+  selfip_v6s:
+    - 2001::192:168:10:201
+    - 2001::192:168:10:202
+    - 2001::192:168:10:203
+  prefixlen_v6: 112
+  auto_lasthop: "AUTO_LASTHOP_ENABLED"
+```
+
+When network interfaces are connected to the TMM such as the (scalable functions in this case connected to the TMM through the Network Attachment Definition), these interfaces get assigned index numbers based on the order they are configured in such as `1.1` and so forth. In the `F5SPKVlan` configuration above note `interfaces` section referencing `1.1` and `1.2`.
+
+Here is a quick description on how the interfaces map in this particular lab guide.\
+>NOTE: Please note that this description is a simplified overview of the interface naming assignment for clarity on this particular lab guide.
+  - Network Attachments configured with names `sf-internal` and `sf-external`
+  - The `SPKInfrastructure` CR connects these interfaces as follows
+    ```yaml
+    networkAttachment:
+    - name: default/sf-external
+    - name: default/sf-internal
+    ```
+    where the order is `sf-external` then `sf-internal`
+  - First network `sf-external` gets assigned `1.1` and `sf-internal` assigned `1.2`
+
+Validate network configuration by checking CR status
+
+```bash
+host# kubectl get f5-spk-vlan
+NAME       READY   MESSAGE                                AGE
+external   True    CR config sent to all grpc endpoints   30h
+internal   True    CR config sent to all grpc endpoints   30h
+```
+
+2. Prepare for tenant VXLAN overlay
+
+This lab guide assumes there will be two namespaces for tenant workload **red** and **blue** and that their egress/ingress is configured through VXLAN overlay. The following diagram shows tenant VXLAN config with focus on the **red** tenant knowing that blue tenant would be the same.
+
+![bnk-lab-tenant-vxlan](media/nvidia_bnk_lab_diagram_egress_vxlan.svg)
+
+To configure this we use `F5SPKVxlan` CR which establishes the overlay configurations to the host and `F5SPKEgress` CR that assigns the egress rules for namespace to specific VXLAN.
+
+The following `F5SPKVxlan` CRs configures two VXLANs **red** with VNI 100 and **blue** with VNI 200
+
+>NOTE: The virtual function created on host on PF1 is assumed to be `enp83s0f1v0` in this guide. Replace every instance of `enp83s0f1v0` with the actual configured host-side virtual function.
+
+>NOTE: The `remote_nodes` represent the host nodes only. Modify the list to properly reflect cluster node names and configured IP addresses as required. DPU nodes are not required here since workload is only expected on the host.
+
+```yaml
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKVxlan
+metadata:
+  name: "red"
+spec:
+  name: "red"
+  port: 4789
+  key: 100
+  # Interface name on host nodes that is used for underlay.
+  # This is the previously configured Virtual Functionon PF1.
+  remote_interface_name: "enp83s0f1v0"
+  # Host nodes
+  remote_nodes:
+     # host node name in Kubernetes cluster.
+   - node_name: "host-1"
+     # Underlay IP address as configured on virtual function.
+     # Change if different in your infrastructure.
+     node_ip: "192.168.20.41"
+     # Mac address and IP addresses that will be assigned to the
+     # Host side VXLAN overlay interface.
+     peer_mac: "00:f5:00:00:00:02"
+     peerip_v4: "198.18.100.1"
+     peerip_v6: "fd50::192:18:100:1"
+   - node_name: "host-2"
+     node_ip: "192.168.20.42"
+     peer_mac: "00:f5:00:00:00:03"
+     peerip_v4: "198.18.100.2"
+     peerip_v6: "fd50::192:18:100:2"
+   - node_name: "host-3"
+     node_ip: "192.168.20.43"
+     peer_mac: "00:f5:00:00:00:04"
+     peerip_v4: "198.18.100.3"
+     peerip_v6: "fd50::192:18:100:3"
+  local_ips:
+   - "192.168.20.201"
+   - "192.168.20.202"
+   - "192.168.20.203"
+  selfip_v4s:
+   - "198.18.100.201"
+   - "198.18.100.202"
+   - "198.18.100.203"
+  prefixlen_v4: 24
+  selfip_v6s:
+   - "fd50::192:18:100:201"
+   - "fd50::192:18:100:202"
+   - "fd50::192:18:100:203"
+  prefixlen_v6: 112
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKVxlan
+metadata:
+  name: "blue"
+spec:
+  name: "blue"
+  port: 4789
+  key: 200
+  remote_interface_name: "enp83s0f1v0"
+  remote_nodes:
+   - node_name: "host-1"
+     node_ip: "192.168.10.41"
+     peer_mac: "00:f5:01:00:00:02"
+     peerip_v4: "198.18.200.1"
+     peerip_v6: "fd50::192:18:200:1"
+   - node_name: "host-2"
+     node_ip: "192.168.10.42"
+     peer_mac: "00:f5:01:00:00:03"
+     peerip_v4: "198.18.200.2"
+     peerip_v6: "fd50::192:18:200:2"
+   - node_name: "host-3"
+     node_ip: "192.168.10.43"
+     peer_mac: "00:f5:01:00:00:04"
+     peerip_v4: "198.18.200.3"
+     peerip_v6: "fd50::192:18:200:3"
+  local_ips:
+   - "192.168.20.201"
+   - "192.168.20.202"
+   - "192.168.20.203"
+  selfip_v4s:
+   - "198.18.200.201"
+   - "198.18.200.202"
+   - "198.18.200.203"
+  prefixlen_v4: 24
+  selfip_v6s:
+   - "fd50::192:18:200:201"
+   - "fd50::192:18:200:202"
+   - "fd50::192:18:200:203"
+  prefixlen_v6: 112
+```
+
+### TODO
+- Configure Egress
+- Install test tenant
+- Configure Gateway API
