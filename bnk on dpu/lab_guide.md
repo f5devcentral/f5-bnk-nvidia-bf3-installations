@@ -23,7 +23,9 @@
     - [Configure Kubernetes Cluster](#configure-kubernetes-cluster)
     - [Install BIG-IP Next for Kubernetes](#install-big-ip-next-for-kubernetes)
     - [Configure BIG-IP Next for Kubernetes](#configure-big-ip-next-for-kubernetes)
-    - [TODO](#todo)
+      - [Configure underlay network.](#configure-underlay-network)
+      - [Egress path configuration](#egress-path-configuration)
+      - [Configuration for Service Access from outside (ingress)](#configuration-for-service-access-from-outside-ingress)
 
 ## Introduction
 
@@ -60,18 +62,21 @@ This lab guide configures a single Kubernetes cluster that includes Hosts and DP
 
 ![bnk-lab-diagram](media/nvidia_bnk_lab_diagram.svg)
 
-There are three main networks in the diagram:\
-**Management Network:** The main underlay network for the Kubernetes cluster CNI and has the default gateway to reach internet. Both Host and the Nvidia BF-3 DPU are connected to this network and has addresses configured through DHCP.\
-**Internal Network:** Represents an internal network path between the host deployed services and the BNK Dataplane deployed in the DPU. This network will be utilized to route ingress and egress traffic for workload deployed on the host through BNK Dataplane.\
+There are three main networks in the diagram:
+
+**Management Network:** The main underlay network for the Kubernetes cluster CNI and has the default gateway to reach internet. Both Host and the Nvidia BF-3 DPU are connected to this network and has addresses configured through DHCP.
+
+**Internal Network:** Represents an internal network path between the host deployed services and the BNK Dataplane deployed in the DPU. This network will be utilized to route ingress and egress traffic for workload deployed on the host through BNK Dataplane.
+
 **External Network:** The external network represents an "external-to-the-cluster" infrastructure network segment to reach external services/destinations.
 
-The Test Servers represent clients and servers that are reachable on different segments of the network.\
+The Test Servers represent clients and servers that are reachable on different segments of the network.
 >_This could also be a single server connected to both Internal and External networks_
 
 ### Hardware
 
 This lab guide was tested on the following hardware configurations:
->Note: The hardware list below serves as example for tested platforms. Only one of those or any other Nvidia DPU-3 compatible system is required for this guide.\
+>Note: The hardware list below serves as example for tested platforms. Only one of those or any other Nvidia DPU-3 compatible system is required for this guide.
 >**Note: The Test Servers are not included.**
 
 
@@ -184,7 +189,7 @@ host# /usr/sbin/ofed_uninstall.sh --force
 host# sudo apt-get autoremove
 ```
 
-Install DOCA-all or DOCA-net.\
+Install DOCA-all or DOCA-net.
 >Note: Make sure to select the correct architecture for the host. In this example it is x86_64.
 
 These instructions are from [DOCA software download site](https://developer.nvidia.com/doca-downloads?deployment_platform=Host-Server&deployment_package=DOCA-Host&target_os=Linux)
@@ -224,7 +229,7 @@ Dec 15 18:46:43 node6 rshim[3675]: pcie-0000:e2:00.2 enable
 Dec 15 18:46:44 node6 rshim[3675]: rshim0 attached
 ```
 
-The Rshim driver exposes a virtual interface named `tmfifo_net0` and the default network configuration for the DPU tmfifo interface is `192.168.100.2/30`\
+The Rshim driver exposes a virtual interface named `tmfifo_net0` and the default network configuration for the DPU tmfifo interface is `192.168.100.2/30`
 
 
 Configure an IP address on the host `tmfifo_net0` interface as a way to connect to DPU if needed.
@@ -782,7 +787,7 @@ dpu# kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-
 host# kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
 ```
 
-4. Install SR-IOV Device Plugin\
+4. Install SR-IOV Device Plugin
 
 First we create the configmap for SR-IOV Device plugin to find and assign the scalable functions that were created as part of the DPU installation.\
 Create a file named `sriov-configmap.yaml` with the following content:
@@ -1213,7 +1218,7 @@ The operator helps in installing BIG-IP Next for Kubernetes software. It require
 **`SPKInfrastructure`** to describe dataplane infrastructure connections and settings AND\
 **`SPKInstance`** Declared state and configuration of the BIG-IP Next for Kubernetes components
 
-9. Apply the `SPKInfrastructure` resource, which will include refernces to the Network Attachment Definitions created earlier, and the resources provisioned for these networks as configured in the SR-IOV device plugin section.\
+9. Apply the `SPKInfrastructure` resource, which will include refernces to the Network Attachment Definitions created earlier, and the resources provisioned for these networks as configured in the SR-IOV device plugin section.
 
 ```bash
 host# cat << EOF | kubectl apply -f -
@@ -1357,8 +1362,7 @@ Ensure that all pods in default and f5-utils namespaces are healthy. This can ta
 BIG-IP Next for Kubernetes dataplane componenet (TMM) configures and performs all it's networking stack tasks in user-space and attaches to Scalable Functions interfaces using DPDK driver.\
 TMM network is configured through Custom Resources and we will use some of them to configure the installation in accordance with the lab guide diagram.
 
-
-1. Configure underlay network.
+#### Configure underlay network.
 
 These are the IP addresses directly connected to the network segments/infrastructure. To configure underlay addresses we use the `F5SPKVlan` Custom Resource.
 
@@ -1418,7 +1422,7 @@ spec:
 
 When network interfaces are connected to the TMM such as the (scalable functions in this case connected to the TMM through the Network Attachment Definition), these interfaces get assigned index numbers based on the order they are configured in such as `1.1` and so forth. In the `F5SPKVlan` configuration above note `interfaces` section referencing `1.1` and `1.2`.
 
-Here is a quick description on how the interfaces map in this particular lab guide.\
+Here is a quick description on how the interfaces map in this particular lab guide.
 >NOTE: Please note that this description is a simplified overview of the interface naming assignment for clarity on this particular lab guide.
   - Network Attachments configured with names `sf-internal` and `sf-external`
   - The `SPKInfrastructure` CR connects these interfaces as follows
@@ -1439,13 +1443,14 @@ external   True    CR config sent to all grpc endpoints   30h
 internal   True    CR config sent to all grpc endpoints   30h
 ```
 
-2. Prepare for tenant VXLAN overlay
+#### Egress path configuration
 
 This lab guide assumes there will be two namespaces for tenant workload **red** and **blue** and that their egress/ingress is configured through VXLAN overlay. The following diagram shows tenant VXLAN config with focus on the **red** tenant knowing that blue tenant would be the same.
 
 ![bnk-lab-tenant-vxlan](media/nvidia_bnk_lab_diagram_egress_vxlan.svg)
 
-To configure this we use `F5SPKVxlan` CR which establishes the overlay configurations to the host and `F5SPKEgress` CR that assigns the egress rules for namespace to specific VXLAN.
+1. Configure VXLAN overlay
+To configure this we use `F5SPKVxlan` CR which establishes the overlay configurations to the host, a `F5SPKSnatpool` CR to set IP addresses used for SNATing egress traffic towards the network infrastructure, and `F5SPKEgress` CR that assigns the egress rules for namespace to specific VXLAN.
 
 The following `F5SPKVxlan` CRs configures two VXLANs **red** with VNI 100 and **blue** with VNI 200
 
@@ -1544,7 +1549,194 @@ spec:
   prefixlen_v6: 112
 ```
 
-### TODO
-- Configure Egress
-- Install test tenant
-- Configure Gateway API
+2. Configure SNATPool
+
+the `addressList` section is a list of lists of SNAT IP addresses that are assigned to each TMM. Since we have 3 TMMs here, we will create 3 lists one for each TMM.
+
+The SNAT addresess are unique per TMM. And they are picked based on the closest IP address to the nexthop (gateway or direct network) for intended destination.
+
+```yaml
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKSnatpool
+metadata:
+  name: "red-snat"
+spec:
+  name: "red-snat"
+  addressList:
+    - - 192.168.10.221
+      - 2001::192:168:10:221
+      - 192.168.20.221
+      - 2001::192:168:20:221
+    - - 192.168.10.222
+      - 2001::192:168:10:222
+      - 192.168.20.222
+      - 2001::192:168:20:222
+    - - 192.168.10.223
+      - 2001::192:168:10:223
+      - 192.168.20.223
+      - 2001::192:168:20:223
+---
+apiVersion: "k8s.f5net.com/v1"
+kind: F5SPKSnatpool
+metadata:
+  name: "blue-snat"
+spec:
+  name: "blue-snat"
+  addressList:
+    - - 192.168.10.231
+      - 2001::192:168:10:231
+      - 192.168.20.231
+      - 2001::192:168:20:231
+    - - 192.168.10.232
+      - 2001::192:168:10:232
+      - 192.168.20.232
+      - 2001::192:168:20:232
+    - - 192.168.10.233
+      - 2001::192:168:10:233
+      - 192.168.20.233
+      - 2001::192:168:20:233
+```
+3. Configure `F5SPKEgress` to assign tenants egress to their prespective VXLAN
+
+```yaml
+---
+apiVersion: k8s.f5net.com/v3
+kind: F5SPKEgress
+metadata:
+  name: red-egress
+spec:
+  dualStackEnabled: true
+  snatType: SRC_TRANS_SNATPOOL
+  egressSnatpool: red-snat
+  pseudoCNIConfig:
+    namespaces:
+      - red
+    # Routing default pod interface eth0.
+    # Assumes pod does not have additional interfaces configured.
+    appPodInterface: eth0
+    # Name of VXLAN interface created on the host
+    # This is basically the same name as the VXLAN name in CR.
+    appNodeInterface: red
+    # Name of VXLAN interface on TMM which is the VXLAN CR name.
+    vlanName: red
+---
+apiVersion: k8s.f5net.com/v3
+kind: F5SPKEgress
+metadata:
+  name: blue-egress
+spec:
+  dualStackEnabled: true
+  snatType: SRC_TRANS_SNATPOOL
+  egressSnatpool: blue-snat
+  pseudoCNIConfig:
+    namespaces:
+      - blue
+    appPodInterface: eth0
+    appNodeInterface: blue
+    vlanName: blue
+```
+
+#### Configuration for Service Access from outside (ingress)
+
+BIG-IP Next for Kubernetes is also a controller for Kubernetes Gateway API. In the following example we will deploy a simple Nginx service in the **red** tenant namespace and advertise it's service to the infrastructure.
+
+The following diagram represents the service ingress path.
+
+![bnk_ingress_vxlan](media/nvidia_bnk_lab_diagram_ingress_vxlan.svg)
+
+1. Deploy nginx to the red namespace.
+
+```bash
+host# cat << EOF | kubectl -n red apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx-tcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-tcp
+  template:
+    metadata:
+      labels:
+        app: nginx-tcp
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/gpu: ""
+      containers:
+      - name: nginx-tcp
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-app-svc
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx-tcp
+EOF
+```
+2. Expose the service to network
+
+The gateway CRs below cause TMM to configure and expose virtual server at IP `192.168.10.100` port `80` as the diagram suggested.
+
+>NOTE: For simplicity an IP address from the same subnet as the test server/client was used but this can be any IP address as long as the server/client is properly routed through one of the TMM's VLAN addresses.
+
+>NOTE: In this configuration, the TMM will use SNAT-AUTOMAP feature which means it will SNAT external client IP addresses when communicating with backend endpoints with TMM's own IP address _not_ an address from snatpool.
+
+```bash
+host# cat << EOF | kubectl -n red apply -f -
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: f5-gateway-class
+  namespace: red
+spec:
+  controllerName: "f5.com/f5-gateway-controller"
+  description: "F5 BIG-IP Kubernetes Gateway"
+---
+apiVersion: gateway.k8s.f5net.com/v1
+kind: Gateway
+metadata:
+  name: my-l4route-tcp-gateway
+  namespace: red
+spec:
+  addresses:
+  - type: "IPAddress"
+    value: 192.168.10.100
+  gatewayClassName: f5-gateway-class
+  listeners:
+  - name: nginx
+    protocol: TCP
+    port: 80
+    allowedRoutes:
+      kinds:
+      - kind: L4Route
+---
+apiVersion: gateway.k8s.f5net.com/v1
+kind: L4Route
+metadata:
+  name: l4-tcp-app
+  namespace: red
+spec:
+  protocol: TCP
+  parentRefs:
+  - name: my-l4route-tcp-gateway
+    sectionName: nginx
+  rules:
+  - backendRefs:
+    - name: nginx-app-svc
+      namespace: red
+      port: 80
+EOF
+```
