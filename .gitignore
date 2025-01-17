@@ -1,0 +1,34 @@
+# Ignore Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pyo
+*.pdb
+*.egg
+*.egg-info/
+*.eggs/
+pip-wheel-metadata/
+*.manifest
+*.spec
+.env/
+.venv/
+env/
+venv/
+ENV/
+
+# Ignore temporary files and directories created by text editors or IDEs
+*.swp
+*.swo
+.idea/
+.vscode/
+*.DS_Store
+*.log
+*.bak
+*.tmp
+*.~*
+
+# Ignore MkDocs build artifacts
+/site/
+

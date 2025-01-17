@@ -1,0 +1,42 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: f5-gateway-class
+  namespace: red
+spec:
+  controllerName: "f5.com/f5-gateway-controller"
+  description: "F5 BIG-IP Kubernetes Gateway"
+---
+apiVersion: gateway.k8s.f5net.com/v1
+kind: Gateway
+metadata:
+  name: my-l4route-tcp-gateway
+  namespace: red
+spec:
+  addresses:
+  - type: "IPAddress"
+    value: 192.168.10.100
+  gatewayClassName: f5-gateway-class
+  listeners:
+  - name: nginx
+    protocol: TCP
+    port: 80
+    allowedRoutes:
+      kinds:
+      - kind: L4Route
+---
+apiVersion: gateway.k8s.f5net.com/v1
+kind: L4Route
+metadata:
+  name: l4-tcp-app
+  namespace: red
+spec:
+  protocol: TCP
+  parentRefs:
+  - name: my-l4route-tcp-gateway
+    sectionName: nginx
+  rules:
+  - backendRefs:
+    - name: nginx-app-svc
+      namespace: red
+      port: 80

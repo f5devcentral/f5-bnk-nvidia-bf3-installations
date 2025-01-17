@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  namespace: red
+  labels:
+    app: nginx-tcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-tcp
+  template:
+    metadata:
+      labels:
+        app: nginx-tcp
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/gpu: ""
+      containers:
+      - name: nginx-tcp
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-app-svc
+  namespace: red
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx-tcp

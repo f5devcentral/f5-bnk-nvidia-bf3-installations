@@ -1,0 +1,35 @@
+---
+apiVersion: k8s.f5net.com/v3
+kind: F5SPKEgress
+metadata:
+  name: red-egress
+spec:
+  dualStackEnabled: true
+  snatType: SRC_TRANS_SNATPOOL
+  egressSnatpool: red-snat
+  pseudoCNIConfig:
+    namespaces:
+      - red
+    # Routing default pod interface eth0.
+    # Assumes pod does not have additional interfaces configured.
+    appPodInterface: eth0
+    # Name of VXLAN interface created on the host
+    # This is basically the same name as the VXLAN name in CR.
+    appNodeInterface: red
+    # Name of VXLAN interface on TMM which is the VXLAN CR name.
+    vlanName: red
+---
+apiVersion: k8s.f5net.com/v3
+kind: F5SPKEgress
+metadata:
+  name: blue-egress
+spec:
+  dualStackEnabled: true
+  snatType: SRC_TRANS_SNATPOOL
+  egressSnatpool: blue-snat
+  pseudoCNIConfig:
+    namespaces:
+      - blue
+    appPodInterface: eth0
+    appNodeInterface: blue
+    vlanName: blue

@@ -1,0 +1,82 @@
+site_name: BIG-IP Next for Kubernetes on Nvidia BlueField-3 DPU
+
+nav:
+  - Home: index.md
+  - 1. Prerequisites: prereq.md
+  - 2. Kubernetes Setup: install-host.md
+  - 3. DPU Setup: install-dpu.md
+  - 4. F5 BNK Install: install-bnk.md
+  - 5. F5 BNK Configuration: configure-bnk.md
+  - 6. F5 BNK Ingress Configuration: bnk-ingress.md
+  - 7. F5 BNK Egress Configuration: bnk-egress.md
+plugins:
+  - search
+  - autorefs
+  - snippets
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: auto
+      height: auto
+      zoomable: true
+      draggable: true
+      auto_caption: true
+      caption_position: bottom
+      background: white
+      shadow: true
+      manual: false
+markdown_extensions:
+  - toc:
+      permalink: "#"
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - tables
+  - abbr
+  - attr_list
+  - md_in_html
+  - admonition
+  - pymdownx.inlinehilite
+  - pymdownx.blocks.caption
+  - pymdownx.snippets:
+      auto_append:
+        - includes/abbreviations.md
+      base_path: docs
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.highlight:
+      use_pygments: true
+      line_spans: __span
+      anchor_linenums: true
+      pygments_lang_class: true
+      auto_title: true
+      linenums: true
+  - footnotes
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+theme:
+  name: material
+  palette: 
+    - scheme: default
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.select
+    - content.code.copy
+    - content.tooltips
+    - content.code.annotate
+    - content.footnote.tooltips
+    - content.action.edit
+    - navigation.expand
+extra_css:
+  - css/extra.css
