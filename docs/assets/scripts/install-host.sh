@@ -83,7 +83,7 @@ EOFVFCONF
 
 install_runc() {
     curl -LO https://github.com/opencontainers/runc/releases/download/v$RUNC_VERSION/runc.$ARCH
-    install -m 755 runc.$ARCH /usr/local/sbin/runc
+    install -m 755 runc.$ARCH /usr/local/bin/runc
 
 }
 
