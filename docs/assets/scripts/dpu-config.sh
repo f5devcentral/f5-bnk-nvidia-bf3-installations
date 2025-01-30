@@ -174,7 +174,7 @@ EOFBFTEMPLATE
         output_file="bfb_config_${hostname}.conf"
 
         echo "Generating configuration for ${hostname} with IP ${ip_address}..."
-        echo "$template" | sed -e "s/{{HOSTNAME}}/${hostname}/g" \
+        echo "$bf_conf_template" | sed -e "s/{{HOSTNAME}}/${hostname}/g" \
             -e "s|{{PASSWORD}}|${ubuntu_password}|g" \
             -e "s/{{IP_ADDRESS}}/${ip_address}/g" \
             -e "s/{{IP_MASK}}/${ip_mask}/g" \
