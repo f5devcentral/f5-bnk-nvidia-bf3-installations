@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+DEBUG=0
+
+if [[ ${DEBUG} -eq 1 ]]; then
+  set -x
+fi
 
 # defaults
 
@@ -37,11 +42,12 @@ esac
 
 
 install_doca_all() {
-  for f in $( dpkg --list | grep doca | awk '{print $2}' ); do
-    echo $f ; apt remove --purge $f -y
+  for f in $( dpkg --list | awk '/doca/ {print $2}' ); do
+    echo "Uninstalling package $f"
+    apt remove --purge "$f" -y || true
   done
-  /usr/sbin/ofed_uninstall.sh --force
-  apt-get autoremove
+  /usr/sbin/ofed_uninstall.sh --force || true
+  apt-get -y autoremove
   DOCA_URL="https://linux.mellanox.com/public/repo/doca/2.9.1/ubuntu22.04/$arch/"
   curl https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub | gpg --yes --dearmor > /etc/apt/trusted.gpg.d/GPG-KEY-Mellanox.pub
   echo "deb [signed-by=/etc/apt/trusted.gpg.d/GPG-KEY-Mellanox.pub] $DOCA_URL ./" > /etc/apt/sources.list.d/doca.list
@@ -58,13 +64,14 @@ network:
       addresses:
         - 192.168.100.1/30
 EONETPLAN
+  chmod 600 /etc/netplan/50-tmfifo.yaml
   netplan apply
 }
 
 configure_virtual_function() {
   # TODO: add script to automatically discover PFs and adds a virtual
   # function to pf1.
-  cat << EOFVFCONF > etc/netplan/10-vf-config.yaml
+  cat << EOFVFCONF > /etc/netplan/10-vf-config.yaml
 network:
   version: 2
   renderer: networkd
@@ -78,6 +85,7 @@ network:
       addresses:
         - 192.168.20.41/24
 EOFVFCONF
+  chmod 600 /etc/netplan/10-vf-config.yaml
   netplan apply
 }
 
@@ -167,16 +175,18 @@ EOL
 
 init_kubernetes() {
     kubeadm init --pod-network-cidr=192.168.0.0/16
+    mkdir -p $HOME/.kube
     cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
     kubectl get node
     echo "Installing Calico CNI ..."
     kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
     kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
-    kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+    kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
+    kubectl taint nodes --all node-role.kubernetes.io/control-plane- || true
     kubectl set env daemonset/calico-node -n calico-system IP_AUTODETECTION_METHOD=cidr="$MGMT_NET"
-    kubectl wait --for=condition=Ready pods --all-namespaces --timeout=300s
     kubectl get pod --all-namespaces
     kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
+    kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
     cat << 'EOSRIOVCONF' | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
@@ -252,6 +262,7 @@ spec:
 EOFCERTMGRCONF
 
     kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/experimental-install.yaml
+    kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
 
 }
 

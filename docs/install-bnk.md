@@ -85,11 +85,39 @@ The Cluster Wide Controller (CWC) component manages license registeration and de
 Generate certificates that will be used to communicate with CWC component API, by pulling the script from F5 repo then generating certs for the f5-utils namespace service as follows.
 
 - Pull and extract the chart containing cert generation scripts
-    ```bash
+    Install required package "make"
+    ```console
+    host# apt-get install -y make
+    Reading package lists... Done
+    Building dependency tree... Done
+    Reading state information... Done
+    Suggested packages:
+      make-doc
+    The following NEW packages will be installed:
+      make
+    0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+    Need to get 180 kB of archives.
+    After this operation, 426 kB of additional disk space will be used.
+    Get:1 http://archive.ubuntu.com/ubuntu jammy/main amd64 make amd64 4.3-4.1build1 [180 kB]
+    Fetched 180 kB in 1s (218 kB/s)
+    Selecting previously unselected package make.
+    (Reading database ... 80515 files and directories currently installed.)
+    Preparing to unpack .../make_4.3-4.1build1_amd64.deb ...
+    Unpacking make (4.3-4.1build1) ...
+    Setting up make (4.3-4.1build1) ...
+    Processing triggers for man-db (2.10.2-1) ...
+    Scanning processes...                                                                                                                                                   
+    Scanning linux images...
+    host#
+    ```
+    ```
+    ```console
     host# helm pull oci://repo.f5.com/utils/f5-cert-gen --version 0.9.1
     Pulled: repo.f5.com/utils/f5-cert-gen:0.9.1
     Digest: sha256:89d283a7b2fef651a29baf1172c590d45fbd1e522fa90207ecd73d440708ad34
+    ```
 
+    ```console
     host# tar zxvf f5-cert-gen-0.9.1.tgz 
     cert-gen/
     cert-gen/LICENSE
@@ -138,7 +166,7 @@ Generate certificates that will be used to communicate with CWC component API, b
 
 - Generate the API self-signed certificates. At the end of this step the script would have generated to main secret files Generating `cwc-license-certs.yaml` and `cwc-license-client-certs.yaml`
 
-    ```bash
+    ```console
     host# sh cert-gen/gen_cert.sh -s=api-server -a=f5-spk-cwc.f5-utils -n=1
     ------------------------------------------------------------------
     Service                   = api-server

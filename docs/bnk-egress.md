@@ -1,3 +1,5 @@
+# BNK Egress
+
 This lab guide assumes there will be two namespaces for tenant workload **red** and **blue** and that their egress/ingress is configured through VXLAN overlay. The following diagram shows tenant VXLAN config with focus on the **red** tenant knowing that blue tenant would be the same.
 
 ![bnk-lab-tnt-vxlan](assets/images/bnk_lab_egress_diagram.svg)

@@ -1,3 +1,10 @@
+---
+title: BNK Installation on DPU
+summary: BNK Install on DPU
+authors:
+    - Quang Nguyen
+    - Wael Shahen
+---
 # F5 Titan BIG-IP Next for Kubernetes Install Instructions on Nvidia BlueField-3
 
 ## Overview
