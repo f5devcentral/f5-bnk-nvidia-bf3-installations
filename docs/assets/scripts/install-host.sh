@@ -180,10 +180,36 @@ init_kubernetes() {
     kubectl get node
     echo "Installing Calico CNI ..."
     kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
-    kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/custom-resources.yaml
+    cat << EOFCALICO | kubectl apply -f -
+---
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  calicoNetwork:
+    ipPools:
+    - name: default-ipv4-ippool
+      blockSize: 26
+      cidr: 192.168.0.0/16
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
+    bgp: Disabled
+    nodeAddressAutodetectionV4:
+      cidrs:
+      - "$MGMT_NET"
+---
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}
+EOFCALICO
+    # Wait for Calico system to start installation and create the calico-system namespace.
+    sleep 30
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
     kubectl taint nodes --all node-role.kubernetes.io/control-plane- || true
-    kubectl set env daemonset/calico-node -n calico-system IP_AUTODETECTION_METHOD=cidr="$MGMT_NET"
     kubectl get pod --all-namespaces
     kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s

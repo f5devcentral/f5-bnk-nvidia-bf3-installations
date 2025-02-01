@@ -58,8 +58,6 @@ host# for ns in red blue; do kubectl create ns $ns; done
 
 To access BNK product images, you must authenticate with the F5 Artifact Registry (FAR). In this section, we will go through obtaining the authentication key and creating Kubernetes pull secret.
 
-<div class="grid" markdown>
-
 - Login to the [MyF5](https://my.f5.com/).
 - Navigate to __Resources__ and click __Downloads__. ![myf5](assets/images/myf5-downloads.png){ align=right }
 - Ensure account is selected then review the [End User License Agreement](https://www.f5.com/pdf/customer-support/end-user-license-agreement.pdf) and the [Program Terms](https://www.f5.com/pdf/customer-support/program-terms.pdf) and click to check the box for `I have read and agreed to the terms of the End User License Agreement and Program Terms.` ![alt text](assets/images/myf5-license-agreement.png)
@@ -75,7 +73,6 @@ To access BNK product images, you must authenticate with the F5 Artifact Registr
       ``` console
       host# cat cne_pull_64.json | helm registry login -u _json_key_base64 --password-stdin https://repo.f5.com
       ```
-</div>
 
 
 ## 4. Cluster Wide Controller requirements
