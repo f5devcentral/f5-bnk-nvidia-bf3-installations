@@ -52,7 +52,7 @@ install_doca_all() {
   curl https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub | gpg --yes --dearmor > /etc/apt/trusted.gpg.d/GPG-KEY-Mellanox.pub
   echo "deb [signed-by=/etc/apt/trusted.gpg.d/GPG-KEY-Mellanox.pub] $DOCA_URL ./" > /etc/apt/sources.list.d/doca.list
   apt-get update
-  apt-get -y install doca-all
+  apt-get -y install rshim
   systemctl enable rshim --now
   cat << EONETPLAN > /etc/netplan/50-tmfifo.yaml
 network:
