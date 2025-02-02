@@ -32,3 +32,5 @@ ENV/
 # Ignore MkDocs build artifacts
 /site/
 
+# Plugin cache
+.cache

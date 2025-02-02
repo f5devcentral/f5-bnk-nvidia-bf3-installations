@@ -13,20 +13,22 @@ The [dpu-config.sh](assets/scripts/dpu-config.sh) script will produce a BlueFiel
 
 ??? note "Show content of dpu-config.sh"
     ``` bash
-    ---8<-- "assets/scripts/dpu-config.sh"
+    ---8<--- "assets/scripts/dpu-config.sh"
     ```
 
-``` console title="DPU Installation"
-host# chmod +x dpu-config.sh && ./dpu-config.sh
-Enter the number of DPUs (default: 1): 1
-Enter the base hostname (default: dpu): test-lab
-Enter the Ubuntu password minimum 12 characters (e.g. 'a123456AbCd!'): 
-Enter tmfifo_net IP subnet mask. Useful if you have more than 1 DPU (default: 30): 
-Generating configuration for test-lab-1 with IP 192.168.100.2...
-Configuration for test-lab-1 is bfb_config_test-lab-1.conf
-To use the config run:
-bfb-install --rshim rshim0 --config bfb_config_test-lab-1.conf --bfb <bf-bundle-path>
-```
+    Run the script to generate BlueField configuration.
+
+    ```console
+    host# chmod +x dpu-config.sh && ./dpu-config.sh
+    Enter the number of DPUs (default: 1): 1
+    Enter the base hostname (default: dpu): test-lab
+    Enter the Ubuntu password minimum 12 characters (e.g. 'a123456AbCd!'): 
+    Enter tmfifo_net IP subnet mask. Useful if you have more than 1 DPU (default: 30): 
+    Generating configuration for test-lab-1 with IP 192.168.100.2...
+    Configuration for test-lab-1 is bfb_config_test-lab-1.conf
+    To use the config run:
+    bfb-install --rshim rshim0 --config bfb_config_test-lab-1.conf --bfb <bf-bundle-path>
+    ```
 
 The script produced a file named `bfb_config_test-lab-1.conf` based on input.
 
@@ -40,7 +42,7 @@ host# bfb-install --rshim rshim0 --config bfb_config_test-lab-1.conf --bfb bf-bu
 
 Follow status of DPU installation on `/dev/rshim0/misc` until DPU is reported ready.
 
-``` console
+```console
 host# cat /dev/rshim0/misc 
 DISPLAY_LEVEL   2 (0:basic, 1:advanced, 2:log)
 BF_MODE         Unknown
@@ -94,6 +96,6 @@ kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token
 
 ### 4.2. Join the Kubernetes cluster on the DPU
 
-``` console
+```console
 dpu# kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token-ca-cert-hash sha256:3cdfd53eb85a23a1700f834ca9aa487aa7f455bfdcbadcb8ed470160ce9c2977
 ```

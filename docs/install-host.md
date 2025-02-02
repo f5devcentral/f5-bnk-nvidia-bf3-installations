@@ -6,7 +6,7 @@ Download the [install-host.sh](assets/scripts/install-host.sh) and modify the fo
 
 ??? note "Show content of install-host.sh"
     ``` bash
-    ---8<-- "assets/scripts/install-host.sh"
+    ---8<--- "assets/scripts/install-host.sh"
     ```
 
 
@@ -21,7 +21,8 @@ Download the [install-host.sh](assets/scripts/install-host.sh) and modify the fo
 
 Then run the script on the host machine.
 
-``` console title="Host Software Installation"
+```bash {title="Host Software Installation", data-copy-strip="^(host# )"}
+
 host# chmod +x install-host.sh && ./install-host.sh
 ```
 

@@ -41,10 +41,8 @@ For the purpose of this document, the diagram below illustrates a high-level dep
 This lab guide configures a single Kubernetes cluster that includes Hosts and DPUs as worker nodes. It assumes that one of the hosts will act as a Kuberentes controller (and allows workload deployment) while other hosts and DPUs join the cluster as worker nodes.
 
 
-![bnk-lab-diagram](assets/images/bnk_lab_diagram.svg)
-/// caption
-Figure 1. Lab Network Diagram
-///
+![bnk-lab-diagram](assets/images/bnk_lab_diagram.png)
+
 
 There are three main networks in the diagram:
 

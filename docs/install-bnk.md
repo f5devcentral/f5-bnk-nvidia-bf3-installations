@@ -58,21 +58,22 @@ host# for ns in red blue; do kubectl create ns $ns; done
 
 To access BNK product images, you must authenticate with the F5 Artifact Registry (FAR). In this section, we will go through obtaining the authentication key and creating Kubernetes pull secret.
 
-- Login to the [MyF5](https://my.f5.com/).
-- Navigate to __Resources__ and click __Downloads__. ![myf5](assets/images/myf5-downloads.png){ align=right }
-- Ensure account is selected then review the [End User License Agreement](https://www.f5.com/pdf/customer-support/end-user-license-agreement.pdf) and the [Program Terms](https://www.f5.com/pdf/customer-support/program-terms.pdf) and click to check the box for `I have read and agreed to the terms of the End User License Agreement and Program Terms.` ![alt text](assets/images/myf5-license-agreement.png)
-- For Group select __BIT-IP_Next__, and __Service Proxy for Kubernetes (SPK)__ in Product Line, and __1.9.2__ for Product Version. ![MyF5 Select Product Family](assets/images/myf5-spk-192.png)
-- Select __f5-far-auth-key.tgz__ to download. ![MyF5 Select FAR File](assets/images/myf5-select-far.png)
-- Choose a location to download from and then download the file or copy link and download on the host linux. ![MyF5 Download FAR Auth](assets/images/myf5-download-far-auth.png)
-- Copy the downloaded file `zxvf f5-far-auth-key.tgz` to host dpu-install directory and expand to see a file named `cne_pull_64.json`. That is the file that contains FAR authentication key.
-- Use the [far-kubernetes-secret.sh](assets/scripts/far-kubernetes-secret.sh) generate and install required Kubernetes pull secrets for FAR images.
-      ``` console
-      host# ./far-kubernetes-secret.sh
-      ```
-- Login to FAR helm registery from host terminal where kubectl and helm commands are available
-      ``` console
-      host# cat cne_pull_64.json | helm registry login -u _json_key_base64 --password-stdin https://repo.f5.com
-      ```
+
+1. Login to the [MyF5](https://my.f5.com/).
+2. Navigate to __Resources__ and click __Downloads__. ![myf5](assets/images/myf5-downloads.png){ align=right }
+3. Ensure account is selected then review the [End User License Agreement](https://www.f5.com/pdf/customer-support/end-user-license-agreement.png) and the [Program Terms](https://www.f5.com/pdf/customer-support/program-terms.png) and click to check the box for `I have read and agreed to the terms of the End User License Agreement and Program Terms.` ![alt text](assets/images/myf5-license-agreement.png)
+4. For Group select __BIT-IP_Next__, and __Service Proxy for Kubernetes (SPK)__ in Product Line, and __1.9.2__ for Product Version. ![MyF5 Select Product Family](assets/images/myf5-spk-192.png)
+5. Select __f5-far-auth-key.tgz__ to download. ![MyF5 Select FAR File](assets/images/myf5-select-far.png)
+6. Choose a location to download from and then download the file or copy link and download on the host linux. ![MyF5 Download FAR Auth](assets/images/myf5-download-far-auth.png)
+7. Copy the downloaded file `zxvf f5-far-auth-key.tgz` to host dpu-install directory and expand to see a file named `cne_pull_64.json`. That is the file that contains FAR authentication key.
+8. Use the [far-kubernetes-secret.sh](assets/scripts/far-kubernetes-secret.sh) generate and install required Kubernetes pull secrets for FAR images.
+    ``` console
+    host# ./far-kubernetes-secret.sh
+    ```
+9. Login to FAR helm registery from host terminal where kubectl and helm commands are available
+    ``` console
+    host# cat cne_pull_64.json | helm registry login -u _json_key_base64 --password-stdin https://repo.f5.com
+    ```
 
 
 ## 4. Cluster Wide Controller requirements
@@ -107,7 +108,7 @@ Generate certificates that will be used to communicate with CWC component API, b
     Scanning linux images...
     host#
     ```
-    ```
+
     ```console
     host# helm pull oci://repo.f5.com/utils/f5-cert-gen --version 0.9.1
     Pulled: repo.f5.com/utils/f5-cert-gen:0.9.1
@@ -343,7 +344,7 @@ The `SPKInfrastructure` resources is defined here [infrastructure-cr.yaml](asset
 
 ??? note "Show SPKInfrastructure content"
     ``` yaml
-    ---8<-- "assets/config/infrastructure-cr.yaml"
+    ---8<--- "assets/config/infrastructure-cr.yaml"
     ```
 
 ### `SPKInstance` Custom Resource
@@ -352,7 +353,7 @@ Download or copy the [instance-cr.yaml](assets/config/instance-cr.yaml) file and
 
 ??? note "Show SPKInstance content"
     ``` yaml
-    ---8<-- "assets/config/instance-cr.yaml"
+    ---8<--- "assets/config/instance-cr.yaml"
     ```
 
 Ensure that all pods in `default` and `f5-utils` namespaces are healthy. This can take up to 10 minutes.

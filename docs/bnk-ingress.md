@@ -2,13 +2,13 @@ BIG-IP Next for Kubernetes is also a controller for Kubernetes Gateway API. In t
 
 The following diagram represents the service ingress path.
 
-![bnk_inss_vxlan](assets/images/bnk_lab_ingress_diagram.svg)
+![bnk_inss_vxlan](assets/images/bnk_lab_ingress_diagram.png)
 
 Apply the [nginx-deployment.yaml](assets/config/nginx-deployment.yaml) file to deploy Nginx service in the red namespace.
 
 ??? note "Show content of nginx-deployment.yaml"
     ```yaml
-    ---8<-- "assets/config/nginx-deployment.yaml"
+    ---8<--- "assets/config/nginx-deployment.yaml"
     ```
 
 Then expose the service to network by using Kubernetes Gateway API resources.
@@ -17,7 +17,7 @@ Apply the [nginx-gw-api.yaml](assets/config/nginx-gw-api.yaml) file to expose th
 
 ??? note "Show content of nginx-gw-api.yaml"
     ```yaml
-    ---8<-- "assets/config/nginx-gw-api.yaml"
+    ---8<--- "assets/config/nginx-gw-api.yaml"
     ```
 
 !!! note

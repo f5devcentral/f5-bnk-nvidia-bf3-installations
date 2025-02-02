@@ -1,7 +1,7 @@
 # Lab Configuration
 
 The BIG-IP Next for Kubernetes dataplane component (TMM) executes all networking stack operations entirely in user space and connects to Scalable Function (SF) interfaces using the DPDK driver. The TMM's networking configuration is managed through Custom Resources (CRs), and we will utilize these resources to set up the installation as outlined in the lab diagram.
-![BNK on DPU Lab Diagram](assets/images/bnk_lab_diagram.svg)
+![BNK on DPU Lab Diagram](assets/images/bnk_lab_diagram.png)
 
 ## Configure the Underlay Network
 
@@ -23,7 +23,7 @@ To apply this configuration, download, modify if needed, and apply the VLAN conf
 
 ??? note "Show content of bnk-vlans.yaml"
     ```yaml
-    ---8<-- "assets/config/bnk-vlans.yaml"
+    ---8<--- "assets/config/bnk-vlans.yaml"
     ```
 
 !!! note

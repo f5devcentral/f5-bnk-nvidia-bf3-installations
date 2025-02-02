@@ -2,7 +2,7 @@
 
 This lab guide assumes there will be two namespaces for tenant workload **red** and **blue** and that their egress/ingress is configured through VXLAN overlay. The following diagram shows tenant VXLAN config with focus on the **red** tenant knowing that blue tenant would be the same.
 
-![bnk-lab-tnt-vxlan](assets/images/bnk_lab_egress_diagram.svg)
+![bnk-lab-tnt-vxlan](assets/images/bnk_lab_egress_diagram.png)
 
 ## Configure VXLAN overlay
 To configure this we use `F5SPKVxlan` CR which establishes the overlay configurations to the host, a `F5SPKSnatpool` CR to set IP addresses used for SNATing egress traffic towards the network infrastructure, and `F5SPKEgress` CR that assigns the egress rules for namespace to specific VXLAN.
@@ -17,7 +17,7 @@ Apply [bnk-vxlan.yaml](assets/config/bnk-vxlan.yaml) to create VXLAN tunnels for
 
 ??? note "Show bnk-vxlan.yaml content"
     ```yaml
-    ---8<-- "assets/config/bnk-vxlan.yaml"
+    ---8<--- "assets/config/bnk-vxlan.yaml"
     ```
 
 
@@ -31,7 +31,7 @@ Apply [bnk-snatpool.yaml](assets/config/bnk-snatpool.yaml) to create SNAT addres
 
 ??? note "Show bnk-snatpool.yaml content"
     ```yaml
-    ---8<-- "assets/config/bnk-snatpool.yaml"
+    ---8<--- "assets/config/bnk-snatpool.yaml"
     ```
 
 ## Configure `F5SPKEgress` to assign tenants egress to their prespective VXLAN
@@ -40,9 +40,5 @@ Now we can apply [bnk-egress.yaml](assets/config/bnk-egress.yaml) egress path in
 
 ??? note "Show bnk-egress.yaml content"
     ```yaml
-    ---8<-- "assets/config/bnk-egress.yaml"
+    ---8<--- "assets/config/bnk-egress.yaml"
     ```
-
-## Test
-
-TODO
