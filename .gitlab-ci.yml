@@ -4,7 +4,7 @@ pages:
   stage: deploy
   image: python:latest
   script:
-    - pip install mkdocs-material mkdocs-autorefs mkdocs-exclude mkdocs-get-deps mkdocs-glightbox mkdocs-material-extensions mkdocs-simple-hooks mkdocs-snippets mkdocs-minify-plugin mkdocs-extra-sass-plugin qrcode mkdocs-git-revision-date-localized-plugin
+    - pip install mkdocs-material mkdocs-autorefs mkdocs-exclude mkdocs-get-deps mkdocs-glightbox mkdocs-material-extensions mkdocs-simple-hooks mkdocs-snippets mkdocs-minify-plugin mkdocs-extra-sass-plugin qrcode mkdocs-git-revision-date-localized-plugin mkdocs-with-pdf
     - mkdocs build --site-dir public
   artifacts:
     paths:
