@@ -15,8 +15,6 @@ spec:
       labels:
         app: nginx-tcp
     spec:
-      nodeSelector:
-        node-role.kubernetes.io/gpu: ""
       containers:
       - name: nginx-tcp
         image: nginx:latest

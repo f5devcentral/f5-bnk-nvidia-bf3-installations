@@ -11,9 +11,8 @@ The `F5SPKVlan` resources below configure two **untagged VLANs**:
 - **internal**: Connected to the internal network segment.
 - **external**: Connected to the external network segment.
 
-The IPv4 and IPv6 address lists specify the **underlay IP addresses** reachable through these network segments. Each address from the list is assigned to one instance of TMM. The addresses list must include enough IP addresses enough for the number of TMM instances planned. Foe example if we have 3 DPU nodes, we require **at least three IP addresses in the list**.
+The IPv4 and IPv6 address lists specify the **underlay IP addresses** reachable through these network segments. Each address from the list is assigned to one instance of TMM. The addresses list must include enough IP addresses enough for the number of TMM instances planned. For example if we have 3 DPU nodes, we require **at least three IP addresses in the list**.
 
-The IPv4 and IPv6 address lists define the **underlay IP addresses** reachable through these network segments. Each address in the list is assigned to a single instance of TMM. Ensure the list contains enough IP addresses to match the total number of TMM instances planned.
 
 !!! example
     For example, if there are 3 DPU nodes in the deployment, you will need at least three IP addresses in the list.
@@ -63,6 +62,9 @@ internal   True    CR config sent to all grpc endpoints   30h
 In this lab we will build VXLAN networks between the host node and the TMM to segregate tenants based on namespaces. Calico CNI as installed and configured in this lab will create rules to deny VXLAN traffic from different external sources than node list, and thus we need to explicitly allow the TMM VXLAN traffic to pass through host node to workload.
 
 In order to achieve that we need to patch calico's felixconfiguration to allow TMM's internal VLAN IP addresses.
+
+!!! tip
+    Make sure the IP addresses match what is configured in the `F5SPKVlan` internal CR.
 
 ```console
 host# kubectl patch felixconfiguration default --type='merge' -p='{"spec": {"externalNodesList": ["192.168.20.201", "192.168.20.202", "192.168.20.203"]}}'
