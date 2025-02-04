@@ -287,7 +287,7 @@ spec:
     secretName: bnk-ca
 EOFCERTMGRCONF
 
-    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/experimental-install.yaml
+    kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/experimental-install.yaml
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
 
 }
