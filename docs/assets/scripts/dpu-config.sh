@@ -80,8 +80,8 @@ EOFSF
     # 2. Add the new created SFs, "sfnum 1" to their corresponding bridges.
     #    Also include the virtual functions that are going to be created on host.
     #    These vfs may not exist yet.
-    ##sed -i -E "s|^(OVS_BRIDGE1_PORTS=\")(.*)\"|\1\2 en3f0pf0sf1 pf0vf0\"|" /mnt/etc/mellanox/mlnx-ovs.conf
-    ##sed -i -E "s|^(OVS_BRIDGE2_PORTS=\")(.*)\"|\1\2 en3f1pf1sf1 pf1vf0\"|" /mnt/etc/mellanox/mlnx-ovs.conf
+    sed -i -E 's|^(OVS_BRIDGE2_PORTS=")[^"]*(")|\1p0 en3f0pf0sf1\2|' /mnt/etc/mellanox/mlnx-ovs.conf
+    sed -i -E 's|^(OVS_BRIDGE2_PORTS=")[^"]*(")|\1p1 en3f1pf1sf1 pf1vf0\2|' /mnt/etc/mellanox/mlnx-ovs.conf
 
     # Cloud-init for upgrading containerd and runc
     cat << EOFCLOUDINIT >> /mnt/var/lib/cloud/seed/nocloud-net/user-data
