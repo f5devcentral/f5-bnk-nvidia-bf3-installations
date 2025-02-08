@@ -17,7 +17,7 @@ MGMT_NET="10.144.0.0/16"
 # Change this variable to point to the correct PF1 interface
 # name on the host.
 PF_INT=enp83s0f1np1
-VF_INT=$(echo ${PF_INT/np1/v0})
+VF_INT=${PF_INT/%np1/v0}
 
 DOCA_VERSION=2.9.1
 K8S_VERSION="1.29"
