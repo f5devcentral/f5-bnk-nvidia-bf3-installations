@@ -40,7 +40,6 @@ aarch64)
 esac
 
 
-
 install_doca_all() {
   for f in $( dpkg --list | awk '/doca/ {print $2}' ); do
     echo "Uninstalling package $f"
@@ -91,10 +90,9 @@ EOFVFCONF
 
 install_runc() {
     curl -LO https://github.com/opencontainers/runc/releases/download/v$RUNC_VERSION/runc.$ARCH
-    install -m 755 runc.$ARCH /usr/local/bin/runc
+    install -m 755 runc.$ARCH /usr/local/sbin/runc
 
 }
-
 
 install_containerd() {
     mkdir -p /etc/containerd
@@ -140,7 +138,7 @@ oom_score = 0
           base_runtime_spec = "/etc/containerd/cri-base.json"
           [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
             systemdCgroup = true
-            binaryName = "/usr/local/bin/runc"
+            binaryName = "/usr/local/sbin/runc"
 EOL
 
     curl -L -o /etc/systemd/system/containerd.service https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
@@ -174,7 +172,7 @@ EOL
 
 
 init_kubernetes() {
-    kubeadm init --pod-network-cidr=192.168.0.0/16
+    kubeadm init --pod-network-cidr=10.244.0.0/16
     mkdir -p $HOME/.kube
     cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
     kubectl get node
@@ -191,10 +189,17 @@ spec:
     ipPools:
     - name: default-ipv4-ippool
       blockSize: 26
-      cidr: 192.168.0.0/16
+      cidr: 10.244.0.0/16
       encapsulation: VXLANCrossSubnet
       natOutgoing: Enabled
       nodeSelector: all()
+    - name: default-ipv6-ippool
+      blockSize: 124
+      cidr: fd00:10:244::/56
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
+  kubernetesNetwork:
     bgp: Disabled
     nodeAddressAutodetectionV4:
       cidrs:
@@ -211,6 +216,10 @@ EOFCALICO
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
     kubectl taint nodes --all node-role.kubernetes.io/control-plane- || true
     kubectl get pod --all-namespaces
+    echo "Adding node annotation for internal static route"
+    for node in $(kubectl get node -o name); do
+      kubectl annotate --overwrite $node k8s.ovn.org/node-primary-ifaddr="192.168.20.41"
+    done
     kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
     cat << 'EOSRIOVCONF' | kubectl apply -f -
@@ -291,8 +300,6 @@ EOFCERTMGRCONF
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
 
 }
-
-
 
 
 # 1. Install DOCA software

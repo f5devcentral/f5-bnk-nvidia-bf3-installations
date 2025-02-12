@@ -16,6 +16,13 @@ spec:
   egress:
     json:
       ipPoolCidrInfo:
+        cidrList:
+        - name: vlan_cidr
+          value: "192.168.20.0/24"
+        - name: vlan_ipv6_cidr
+          value: "2001::192:168:20:0/112"
         ipPoolList:
-        - name: pod_cidr_ipv4
-          value: "192.168.0.0/16"
+        - name: default-ipv4-ippool
+          value: "10.244.0.0/16"
+        - name: default-ipv6-ippool
+          value: "fd00:10:244::/56"
