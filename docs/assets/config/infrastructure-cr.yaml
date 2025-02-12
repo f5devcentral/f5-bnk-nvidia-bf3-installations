@@ -24,5 +24,3 @@ spec:
         ipPoolList:
         - name: default-ipv4-ippool
           value: "10.244.0.0/16"
-        - name: default-ipv6-ippool
-          value: "fd00:10:244::/56"

@@ -65,6 +65,7 @@ network:
 EONETPLAN
   chmod 600 /etc/netplan/50-tmfifo.yaml
   netplan apply
+  sleep 5
 }
 
 configure_virtual_function() {
@@ -86,6 +87,7 @@ network:
 EOFVFCONF
   chmod 600 /etc/netplan/10-vf-config.yaml
   netplan apply
+  sleep 5
 }
 
 install_runc() {
@@ -155,6 +157,7 @@ install_kubernetes_components() {
 net.bridge.bridge-nf-call-ip6tables=1
 net.bridge.bridge-nf-call-iptables=1
 net.ipv4.ip_forward=1
+net.ipv6.conf.default.forwarding=1
 fs.inotify.max_user_watches=2099999999
 fs.inotify.max_user_instances=2099999999
 fs.inotify.max_queued_events=2099999999
@@ -174,7 +177,7 @@ EOL
 init_kubernetes() {
     kubeadm init --pod-network-cidr=10.244.0.0/16
     mkdir -p $HOME/.kube
-    cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
     kubectl get node
     echo "Installing Calico CNI ..."
     kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/tigera-operator.yaml
@@ -193,13 +196,6 @@ spec:
       encapsulation: VXLANCrossSubnet
       natOutgoing: Enabled
       nodeSelector: all()
-    - name: default-ipv6-ippool
-      blockSize: 124
-      cidr: fd00:10:244::/56
-      encapsulation: VXLANCrossSubnet
-      natOutgoing: Enabled
-      nodeSelector: all()
-  kubernetesNetwork:
     bgp: Disabled
     nodeAddressAutodetectionV4:
       cidrs:
@@ -302,6 +298,10 @@ EOFCERTMGRCONF
 }
 
 
+export DEBIAN_FRONTEND=noninteractive
+
+trap 'unset DEBIAN_FRONTEND' ERR EXIT
+
 # 1. Install DOCA software
 install_doca_all
 
@@ -319,3 +319,8 @@ init_kubernetes
 
 # 6. Configure virtual function on PF1
 configure_virtual_function
+
+echo "======================"
+echo "Installation complete."
+
+unset DEBIAN_FRONTEND
