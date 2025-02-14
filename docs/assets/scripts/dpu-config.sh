@@ -66,10 +66,15 @@ EOFSYSCTL
     ilog "$(chroot /mnt env PATH=$PATH /usr/sbin/grub-mkconfig -o /boot/grub/grub.cfg)"
 
     # Provision SF to be used by the TMM on each PF
+    # First clear out the current configurations for default SFs
+    # These default SFs do not have trust mode set to.
+    : > /mnt/etc/mellanox/mlnx-sf.conf
+    # Then add new SFs with trust mode enabled.
     for pciid in $(lspci -nD 2> /dev/null | grep 15b3:a2d[26c] | awk '{print $1}')
         do
             cat << EOFSF >> /mnt/etc/mellanox/mlnx-sf.conf
-/sbin/mlnx-sf --action create --device $pciid --sfnum 1 --hwaddr $(uuidgen | sed -e 's/-//;s/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+/sbin/mlnx-sf --action create --enable-trust --device $pciid --sfnum 0 --hwaddr $(uuidgen | sed -e 's/-//;s/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+/sbin/mlnx-sf --action create --enable-trust --device $pciid --sfnum 1 --hwaddr $(uuidgen | sed -e 's/-//;s/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
 EOFSF
         done
     # OVS changes
@@ -164,8 +169,13 @@ EOFBFTEMPLATE
     ubuntu_password=$(openssl passwd -1 "${clear_password}")
     read -p "Enter tmfifo_net IP subnet mask. Useful if you have more than 1 DPU (default: 30): " ip_mask
     ip_mask=${ip_mask:-30}
-
     base_ip=${base_ip:-192.168.100}
+    read -p "Do you want the DPU mgmt interface oob_net0 to use DHCP? (yes/no, default: yes): " use_dhcp
+    use_dhcp=${use_dhcp:-yes}
+    if [[ "$use_dhcp" =~ ^([nN][oO]|[nN])$ ]]; then
+      read -p "Enter the static IP for oob_net0: " oob_ip
+      read -p "Enter the subnet mask for oob_net0: " oob_mask
+    fi
 
     for ((i=1; i<=num_dpus; i++)); do
         hostname="${base_hostname}-${i}"
