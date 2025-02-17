@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   controller:
-    watchNamespace: red, blue
+    watchNamespace: red,blue
   cwc:
     cpclConfig:
       jwt: <replace-with-jwt-token>
