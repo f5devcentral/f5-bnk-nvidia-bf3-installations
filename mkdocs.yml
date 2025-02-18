@@ -1,9 +1,7 @@
 site_name: BIG-IP Next for Kubernetes on Nvidia BlueField-3 DPU
-site_url: https://docs-70d623.pages.gitswarm.f5net.com
-repo_url: https://gitswarm.f5net.com/sp-pm/docs
-repo_name: sp-pm/docs
+repo_url: https://github.com/f5devcentral/f5-bnk-nvidia-bf3-installations
+repo_name: f5devcentral/f5-bnk-nvidia-bf3-installations
 edit_uri: edit/main/docs/
-# copyright: Copyright © 2025 F5, Inc. All rights reserved.
 nav:
   - Home: index.md
   - 1. Prerequisites: prereq.md
@@ -52,8 +50,6 @@ plugins:
   - search
   - minify:
       minify_html: true
-  # - extra-sass
-  # - autorefs
   - with-pdf:
       author: Quang Nguyen, Wael Shahen
       cover_title: F5 BIG-IP Next for Kubernetes on Nvidia BlueField-3 DPU
@@ -61,17 +57,7 @@ plugins:
       copyright: Copyright © 2025 F5, Inc. All rights reserved.
       back_cover: true
       toc_level: 3
-      # convert_iframe:
-      #   - src: https://streamable.com/e/zmtb00
-      #     img: https://cdn-cf-east.streamable.com/image/zmtb00-screenshot75403.jpg
-      # two_columns_level: 3
-#      render_js: true
-      #headless_chrome_path: google-chrome
       output_path: assets/pdf/bnk_lab_guide.pdf
-      #debug_html: true
-      # verbose: true
-      # show_anchors: true
-      # enabled_if_env: ENABLE_PDF_EXPORT
   - git-revision-date-localized:
       type: timeago
       # enable_creation_date: true
@@ -97,11 +83,6 @@ markdown_extensions:
   - pymdownx.critic
   - pymdownx.details
   - pymdownx.highlight:
-      # linenums: true
-      # line_spans: __codeline
-      # line_anchors: __codelineno
-      # anchor_linenums: true
-      # guess_lang: true
       use_pygments: true
       auto_title: true
       pygments_lang_class: true
