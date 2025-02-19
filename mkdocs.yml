@@ -11,7 +11,6 @@ nav:
   - 5. F5 BNK Configuration: configure-bnk.md
   - 6. F5 BNK Ingress Configuration: bnk-ingress.md
   - 7. F5 BNK Egress Configuration: bnk-egress.md
-
 # Configuration
 theme:
   name: material
