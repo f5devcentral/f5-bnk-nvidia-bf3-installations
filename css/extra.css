@@ -1,0 +1,15 @@
+.highlight .gp { /* Generic.Prompt */
+  user-select: none;
+}
+
+.doc-heading code {
+  font-family: inherit !important;
+  font-size: inherit;
+}
+
+/* https://mkdocstrings.github.io/handlers/python/#recommended-style-material */
+
+div.doc-contents:not(.first) {
+  padding-left: 15px;
+  border-left: 4px solid rgba(230, 230, 230);
+}
