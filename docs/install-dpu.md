@@ -91,11 +91,11 @@ INFO[MISC]: DPU is ready
 
 ``` console
 host# kubeadm token create --print-join-command
-kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token-ca-cert-hash sha256:3cdfd53eb85a23a1700f834ca9aa487aa7f455bfdcbadcb8ed470160ce9c2977
+kubeadm join 10.144.50.50:6443 --token ************************* --discovery-token-ca-cert-hash sha256:*************************
 ```
 
 ### 4.2. Join the Kubernetes cluster on the DPU
 
 ```console
-dpu# kubeadm join 10.144.50.50:6443 --token z8fvlo.ztt3mrepmjoiw2pe --discovery-token-ca-cert-hash sha256:3cdfd53eb85a23a1700f834ca9aa487aa7f455bfdcbadcb8ed470160ce9c2977
+dpu# kubeadm join 10.144.50.50:6443 --token ************************* --discovery-token-ca-cert-hash sha256:*************************
 ```
