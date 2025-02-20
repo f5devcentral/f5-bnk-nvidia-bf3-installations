@@ -406,7 +406,7 @@ Download or copy the [instance-cr-otel.yaml](assets/config/instance-cr-otel.yaml
 
 ??? note "Show SPKInstance content"
     ``` yaml
-    ---8<--- "assets/config/instance-cr.yaml"
+    ---8<--- "assets/config/instance-cr-otel.yaml"
     ```
 
 Ensure that all pods in `default` and `f5-utils` namespaces are healthy. This can take up to 10 minutes.
