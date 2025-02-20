@@ -1,0 +1,170 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: prometheus
+spec:
+  secretName: prometheus-secret
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: bnk-ca-cluster-issuer
+  duration: 8640h
+  privateKey:
+    rotationPolicy: Always
+    encoding: PKCS1
+    algorithm: RSA
+    size: 4096
+  revisionHistoryLimit: 10
+  commonName: f5net.com
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus
+  managedFields:
+  - apiVersion: apps/v1
+  name: prometheus
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        prometheus.io/port: "9090"
+        prometheus.io/scrape: "true"
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - args:
+        - '--storage.tsdb.retention.time=6h'
+        - '--storage.tsdb.path=/prometheus'
+        - '--config.file=/etc/prometheus/prometheus.yaml'
+        image: prom/prometheus
+        imagePullPolicy: Always
+        name: prometheus
+        ports:
+        - containerPort: 9090
+          name: web
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /etc/prometheus
+          name: prometheus-config-volume
+        - mountPath: /prometheus
+          name: prometheus-storage-volume
+        - name: prometheus-volume
+          mountPath: /etc/ssl
+          readOnly: true
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: prometheus-config
+        name: prometheus-config-volume
+      - name: prometheus-volume
+        secret:
+          secretName: prometheus-secret
+      - emptyDir: {}
+        name: prometheus-storage-volume
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: default
+data:
+  prometheus.yaml: |
+    global:
+      scrape_interval: 15s 
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'k8s_pod'
+        kubernetes_sd_configs:
+        - role: pod
+          namespaces:
+            names:
+            - default
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_metrics_prometheus, __meta_kubernetes_pod_container_port_number]
+            regex: publish;9090
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod_name
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+        scheme: https
+        tls_config:
+          ca_file: "/etc/ssl/ca.crt"
+          cert_file: "/etc/ssl/tls.crt"
+          key_file: "/etc/ssl/tls.key"
+          insecure_skip_verify: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: prometheus-service
+    namespace: default
+    annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port:   '9090'
+spec:
+    selector:
+        app: prometheus
+    type: NodePort
+    ports:
+    - port: 8080
+      targetPort: 9090 
+      nodePort: 30000
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-default
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-default
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: default

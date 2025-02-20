@@ -308,6 +308,52 @@ Apply the [network-attachments.yaml](assets/config/network-attachments.yaml) con
 
 This step will create two network attachment definitions for internal and external scalable functions as described in the lab diagram.
 
+## 7. (Optional) Install Grafana and Prometheus
+
+Using Prometheus and Grafana to collect and visualize the metrics.
+
+### Install Prometheus
+
+Prometheus example for this lab is defined in the [prometheus.yaml](assets/config/prometheus.yaml) file.
+
+```yaml
+---8<--- "assets/config/prometheus.yaml"
+```
+
+Apply the file in default namespace
+
+```bash
+host# kubectl apply -f prometheus.yaml
+```
+### Install Grafana
+
+Grafana example for this lab is defined in the [grafana.yaml](assets/config/grafana.yaml) file.
+
+```yaml
+---8<--- "assets/config/grafana.yaml"
+```
+
+Apply the file in default namespace
+
+```bash
+host# kubectl apply -f grafana.yaml
+```
+
+#### Grafana Dashboard
+
+An example Grafana dashboard is provided in the [grafana-dashboard.json](assets/config/grafana-dashboard.json) file.
+
+```json
+---8<--- "assets/config/grafana-dashboard.json"
+```
+
+Import the dashboard into Grafana
+
+```bash
+host# kubectl -n grafana port-forward svc/grafana 3000:3000 &
+host# curl -X POST -H 'Content-Type: application/json' -d @grafana-dashboard.json http://admin:admin@localhost:3000/api/dashboards/db
+```
+
 ## 7. Install BIG-IP Next for Kubernetes Operator in default namespace
 
 The operator helps in installing BIG-IP Next for Kubernetes software. It requires two Custom Resources to be defined for the installation. **`SPKInfrastructure`** to describe dataplane infrastructure connections, and  **`SPKInstance`** which declares the state and configuration of the BNK product installation.
@@ -333,9 +379,26 @@ The `SPKInfrastructure` resources is defined here [infrastructure-cr.yaml](asset
     ---8<--- "assets/config/infrastructure-cr.yaml"
     ```
 
+### Install required Otel Certificates
+
+Otel service requires certificates to be installed with specific name. These certs will be used for TLS communication between Otel and Prometheus.
+
+Certificate requests for this lab can be found at [otel-certs.yaml](assets/config/otel-certs.yaml).
+
+```yaml
+---8<--- "assets/config/otel-certs.yaml"
+```
+
+Apply the certificates to the default namespace.
+
+```bash
+host# kubectl apply -f otel-certs.yaml
+```
+
+
 ### `SPKInstance` Custom Resource
 
-Download or copy the [instance-cr.yaml](assets/config/instance-cr.yaml) file and modify the `jwt:` with your license token obtained from MyF5.
+Download or copy the [instance-cr-otel.yaml](assets/config/instance-cr-otel.yaml) file and modify the `jwt:` with your license token obtained from MyF5.
 
 ??? note "Show SPKInstance content"
     ``` yaml
