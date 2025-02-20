@@ -316,9 +316,10 @@ Using Prometheus and Grafana to collect and visualize the metrics.
 
 Prometheus example for this lab is defined in the [prometheus.yaml](assets/config/prometheus.yaml) file.
 
-```yaml
----8<--- "assets/config/prometheus.yaml"
-```
+??? note "Show Prometheus deployment"
+    ```yaml
+    ---8<--- "assets/config/prometheus.yaml"
+    ```
 
 Apply the file in default namespace
 
@@ -329,9 +330,10 @@ host# kubectl apply -f prometheus.yaml
 
 Grafana example for this lab is defined in the [grafana.yaml](assets/config/grafana.yaml) file.
 
-```yaml
----8<--- "assets/config/grafana.yaml"
-```
+??? note "Show Grafana deployment"
+    ```yaml
+    ---8<--- "assets/config/grafana.yaml"
+    ```
 
 Apply the file in default namespace
 
@@ -343,9 +345,10 @@ host# kubectl apply -f grafana.yaml
 
 An example Grafana dashboard is provided in the [grafana-dashboard.json](assets/config/grafana-dashboard.json) file.
 
-```json
----8<--- "assets/config/grafana-dashboard.json"
-```
+??? note "Show Grafana Dashboard"
+    ```json
+    ---8<--- "assets/config/grafana-dashboard.json"
+    ```
 
 Import the dashboard into Grafana
 
@@ -385,9 +388,10 @@ Otel service requires certificates to be installed with specific name. These cer
 
 Certificate requests for this lab can be found at [otel-certs.yaml](assets/config/otel-certs.yaml).
 
-```yaml
----8<--- "assets/config/otel-certs.yaml"
-```
+??? note "Show Otel Certificates content"
+    ```yaml
+    ---8<--- "assets/config/otel-certs.yaml"
+    ```
 
 Apply the certificates to the default namespace.
 
