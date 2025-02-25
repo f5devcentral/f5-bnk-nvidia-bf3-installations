@@ -23,10 +23,10 @@ spec:
     - name: far-secret
     imageRepository: repo.f5.com/images
     logging:
-      enabled: true
       fluentbitSidecar:
-        host: f5-toda-fluentd.f5-utils.svc.cluster.local
+        enabled: true
         fluentd:
+          host: f5-toda-fluentd.f5-utils.svc.cluster.local
           port: "54321"
   spkInfrastructure: bnk-dpu-infra
   spkManifest: unused
