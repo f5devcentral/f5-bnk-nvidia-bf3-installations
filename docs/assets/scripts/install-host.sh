@@ -214,7 +214,7 @@ EOFCALICO
     kubectl get pod --all-namespaces
     echo "Adding node annotation for internal static route"
     for node in $(kubectl get node -o name); do
-      kubectl annotate --overwrite $node k8s.ovn.org/node-primary-ifaddr={"ipv4":"192.168.20.41"}
+      kubectl annotate --overwrite $node 'k8s.ovn.org/node-primary-ifaddr={"ipv4":"192.168.20.41"}'
     done
     kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
     kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=300s
