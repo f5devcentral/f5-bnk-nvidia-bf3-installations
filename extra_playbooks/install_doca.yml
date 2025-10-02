@@ -1,0 +1,125 @@
+---
+- name: Install NVIDIA DOCA repo and packages
+  hosts: doca_node
+  become: true
+  gather_facts: true
+  vars:
+    doca_repo_url: "https://linux.mellanox.com/public/repo/doca/{{ doca_version }}/ubuntu22.04/x86_64/"
+    doca_key_url:  "https://linux.mellanox.com/public/repo/doca/GPG-KEY-Mellanox.pub"
+    doca_keyring:  "/usr/share/keyrings/doca-archive-keyring.gpg"
+    doca_keyring_asc: "/usr/share/keyrings/doca-archive-keyring.asc"
+    doca_apt_packages:
+      - ca-certificates
+      - doca-networking
+      - pv
+      - curl
+      - jq
+      - htop
+
+  tasks:
+    # --- Cleanup: remove any conflicting legacy entries/keys ---
+    - name: Remove legacy DOCA source file if present
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d/doca.list
+        state: absent
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Remove any DOCA lines from /etc/apt/sources.list (if ever added there)
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list
+        regexp: '^deb .*linux\.mellanox\.com/public/repo/doca/.*$'
+        state: absent
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Remove legacy Mellanox key from trusted.gpg.d if it exists
+      ansible.builtin.file:
+        path: /etc/apt/trusted.gpg.d/GPG-KEY-Mellanox.pub
+        state: absent
+      when: ansible_facts.os_family == "Debian"
+
+    # --- Proper keyring install under /usr/share/keyrings ---
+    - name: Ensure keyring directory exists
+      ansible.builtin.file:
+        path: "{{ doca_keyring | dirname }}"
+        state: directory
+        mode: "0755"
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Download Mellanox DOCA public key (armored)
+      ansible.builtin.get_url:
+        url: "{{ doca_key_url }}"
+        dest: "{{ doca_keyring_asc }}"
+        mode: "0644"
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Dearmor DOCA key into keyring
+      ansible.builtin.command:
+        cmd: "gpg --dearmor -o {{ doca_keyring }} {{ doca_keyring_asc }}"
+      args:
+        creates: "{{ doca_keyring }}"
+      when: ansible_facts.os_family == "Debian"
+
+    # --- Add repo referencing the dearmored keyring ---
+    - name: Add DOCA apt repository (signed-by keyring)
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by={{ doca_keyring }}] {{ doca_repo_url }} ./"
+        filename: "doca"
+        state: present
+      when:
+        - ansible_facts.os_family == "Debian"
+        - ansible_facts.architecture in ["x86_64","amd64"]
+
+    - name: apt update after repo changes
+      ansible.builtin.apt:
+        update_cache: yes
+      when: ansible_facts.os_family == "Debian"
+
+    # --- Install packages ---
+    - name: Install DOCA packages
+      ansible.builtin.apt:
+        name: "{{ doca_apt_packages }}"
+        state: present
+      when:
+        - ansible_facts.os_family == "Debian"
+        - ansible_facts.architecture in ["x86_64","amd64"]
+
+    # --- Enable and start rshim service
+    - name: Enable and start rshim
+      ansible.builtin.systemd:
+        name: rshim
+        enabled: true
+        state: started
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Ensure /etc/netplan exists
+      ansible.builtin.file:
+        path: /etc/netplan
+        state: directory
+        mode: "0755"
+
+    - name: Write netplan for tmfifo_net0 (192.168.100.1/30)
+      ansible.builtin.copy:
+        dest: /etc/netplan/99-tmfifo-net0.yaml
+        mode: "0644"
+        content: |
+          network:
+            version: 2
+            renderer: networkd
+            ethernets:
+              tmfifo_net0:
+                dhcp4: false
+                dhcp6: false
+                addresses:
+                  - 192.168.100.1/30
+                optional: true
+      notify: Apply netplan
+
+    - name: Ensure tmfifo_net0 link is up (runtime)
+      ansible.builtin.command: ip link set tmfifo_net0 up
+      changed_when: false
+      failed_when: false
+
+  handlers:
+    - name: Apply netplan
+      ansible.builtin.command: netplan apply
+      become: true

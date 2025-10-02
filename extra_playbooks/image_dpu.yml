@@ -1,0 +1,162 @@
+---
+- name: Image BlueField DPUs
+  hosts: doca_node
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+    # Uses inventory vars you already set:
+    #   bfb_image, bfb_url_base, dpu_ubuntu_password, dpu_mtu
+    bfb_url: "{{ bfb_url_base }}/{{ bfb_image }}"
+    bfb_config_dir: "/var/tmp"
+    bfb_image_dir: "/var/tmp"
+
+  tasks:
+    - name: Ensure working dirs exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ bfb_config_dir }}"
+        - "{{ bfb_image_dir }}"
+
+    # Read plain password from ENV if provided (Makefile export)
+    - name: Import DPU ubuntu plain password from environment (if present)
+      ansible.builtin.set_fact:
+        DPU_UBUNTU_PASSWORD: "{{ lookup('env', 'DPU_UBUNTU_PASSWORD') }}"
+      when:
+        - DPU_UBUNTU_PASSWORD is not defined
+        - (lookup('env', 'DPU_UBUNTU_PASSWORD') | default('', true) | length) > 0
+
+    # Prefer existing HASH; otherwise derive from plain password
+    # Recommended: strong SHA-512 crypt
+    - name: Derive DPU_UBUNTU_PASSWORD_HASH from plain (sha512_crypt)
+      ansible.builtin.set_fact:
+        DPU_UBUNTU_PASSWORD_HASH: "{{ DPU_UBUNTU_PASSWORD | password_hash('sha512_crypt') }}"
+      when:
+        - DPU_UBUNTU_PASSWORD_HASH is not defined
+        - DPU_UBUNTU_PASSWORD is defined
+
+    - name: Set per-node paths and hostname (and expose BFB_CONFIG)
+      ansible.builtin.set_fact:
+        bfb_hostname: "{{ inventory_hostname }}-dpu"
+        BFB_CONFIG: "{{ bfb_config_dir }}/{{ inventory_hostname }}-dpu.conf"
+        bfb_image_path: "{{ bfb_image_dir }}/{{ bfb_image }}"
+
+    # Decide MTU once (prefer MTU, else calico_mtu, else 9000)
+    - name: Decide DPU MTU
+      ansible.builtin.set_fact:
+        dpu_mtu: >-
+          {{ (MTU
+              if (MTU is defined and (MTU | string | length) > 0)
+              else (calico_mtu
+                    if (calico_mtu is defined and (calico_mtu | string | length) > 0)
+                    else 9000)) | int }}
+
+    # Validate we have a hash and an MTU
+    - name: Validate required vars exist
+      ansible.builtin.assert:
+        that:
+          - DPU_UBUNTU_PASSWORD_HASH is defined
+          - dpu_mtu is defined
+          - (dpu_mtu | int) > 0
+        fail_msg: >-
+          Missing required variables for templating.
+          Ensure DPU_UBUNTU_PASSWORD_HASH is set (or export DPU_UBUNTU_PASSWORD to derive it),
+          and MTU (or calico_mtu) is defined.
+        quiet: true
+
+    # Compute a stable absolute path for artifacts under the inventory's artifacts dir
+    - name: Set artifacts dir (absolute)
+      ansible.builtin.set_fact:
+        artifacts_dir: >-
+          {{ (inventory_dir | realpath) }}/artifacts/dpu-configs
+
+    # Write the config on the remote host (force real write even with --check)
+    - name: Render BFB config on remote host
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../dpu/bf-template.conf"
+        dest: "{{ BFB_CONFIG }}"             # e.g., /var/tmp/<node>-dpu.conf
+        mode: "0600"
+      vars:
+        HOSTNAME: "{{ bfb_hostname }}"
+        MTU: "{{ dpu_mtu }}"
+        MTU_RENDERED: "{{ dpu_mtu }}"
+        DPU_UBUNTU_PASSWORD_HASH: "{{ DPU_UBUNTU_PASSWORD_HASH }}"
+      check_mode: no
+
+    # Make a local folder on the controller to collect configs (create first!)
+    - name: Ensure local artifacts dir exists
+      ansible.builtin.file:
+        path: "{{ artifacts_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      run_once: true
+      become: false
+
+    # Show what’s in the folder (for quick verification) – tolerant & once
+    - name: List generated configs (if any)
+      ansible.builtin.command: bash -lc "ls -l {{ artifacts_dir }}"
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      failed_when: false
+      run_once: true
+
+    # Copy each host’s rendered config back to the controller
+    - name: Fetch rendered BFB config to controller
+      ansible.builtin.fetch:
+        src: "{{ BFB_CONFIG }}"
+        dest: "{{ artifacts_dir }}/{{ inventory_hostname }}-dpu.conf"
+        flat: true
+
+    - name: Download BFB image unless already present
+      ansible.builtin.get_url:
+        url: "{{ bfb_url }}"
+        dest: "{{ bfb_image_path }}"
+        mode: "0644"
+        force: no
+        timeout: 600
+
+    - name: Run bfb-install with rshim0
+      ansible.builtin.command:
+        argv:
+          - bfb-install
+          - --rshim
+          - rshim0
+          - --config
+          - "{{ BFB_CONFIG }}"
+          - --bfb
+          - "{{ bfb_image_path }}"
+      register: bfb_install_result
+      changed_when: "'Successfully' in (bfb_install_result.stdout | default('')) or
+                     'Successfully' in (bfb_install_result.stderr | default(''))"
+
+    - name: Wait until DPU {{ bfb_hostname }} is reachable via ping
+      ansible.builtin.wait_for:
+        host: "{{ bfb_hostname }}"
+        port: 22            # Wait for SSH port (better than raw ICMP)
+        delay: 30           # Initial delay before first try
+        timeout: 900        # Total seconds to wait (15 minutes)
+        state: started
+      delegate_to: localhost
+      become: false
+
+    - name: Install our controller’s SSH public key on the DPU
+      ansible.builtin.command: >
+        sshpass -p "{{ DPU_UBUNTU_PASSWORD }}"
+        ssh-copy-id
+        -i {{ ssh_pubkey_path }}
+        -o StrictHostKeyChecking=no
+        -o UserKnownHostsFile=/dev/null
+        ubuntu@{{ bfb_hostname }}
+      delegate_to: localhost
+      become: false
+
+  handlers:
+    - name: Show BFB config path
+      ansible.builtin.debug:
+        msg: "BFB_CONFIG => {{ BFB_CONFIG }}"

@@ -28,6 +28,8 @@ ENV/
 *.bak
 *.tmp
 *.~*
+.deps
+artifacts
 
 # Ignore MkDocs build artifacts
 /site/
