@@ -1,0 +1,101 @@
+site_name: BIG-IP Next for Kubernetes on Nvidia BlueField-3 DPU
+repo_url: https://github.com/f5devcentral/f5-bnk-nvidia-bf3-installations
+repo_name: f5devcentral/f5-bnk-nvidia-bf3-installations
+edit_uri: edit/main/docs/
+nav:
+  - Home: index.md
+  - 1. Prerequisites: prereq.md
+  - 2. Kubernetes Setup: install-host.md
+  - 3. DPU Setup: install-dpu.md
+  - 4. F5 BNK Install: install-bnk.md
+  - 5. F5 BNK Configuration: configure-bnk.md
+  - 6. F5 BNK Ingress Configuration: bnk-ingress.md
+  - 7. F5 BNK Egress Configuration: bnk-egress.md
+# Configuration
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - content.code.select
+    - content.code.copy
+    - navigation.top
+    - content.action.view
+    - content.action.edit
+
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+    - scheme: slate
+      primary: blue grey
+      accent: blue grey
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/gitlab
+    edit: material/pencil
+    view: material/eye
+  custom_dir: docs/overrides
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+  - with-pdf:
+      author: Quang Nguyen, Wael Shahen
+      cover_title: F5 BIG-IP Next for Kubernetes on Nvidia BlueField-3 DPU
+      cover_subtitle: Lab Guide
+      copyright: Copyright © 2025 F5, Inc. All rights reserved.
+      back_cover: true
+      toc_level: 3
+      output_path: assets/pdf/bnk_lab_guide.pdf
+  - git-revision-date-localized:
+      type: timeago
+      # enable_creation_date: true
+      locale: en
+      # enable_git_follow: true
+  - print-site:
+      path_to_pdf: assets/pdf/bnk_lab_guide.pdf
+
+markdown_extensions:
+  - admonition
+  - abbr
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.highlight:
+      use_pygments: true
+      auto_title: true
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.snippets:
+      auto_append:
+        - includes/abbreviations.md
+      base_path: docs

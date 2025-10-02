@@ -1,0 +1,101 @@
+all:
+  vars:
+    doca_version: 2.9.2
+    bfb_image: "bf-bundle-2.9.2-32_25.02_ubuntu-22.04_prod.bfb"
+    bfb_url_base: "https://content.mellanox.com/BlueField/BFBs/Ubuntu22.04"
+    dpu_ubuntu_password: "{{ lookup('env', 'DPU_UBUNTU_PASSWORD_HASH') }}"
+    ssh_pubkey_path: "{{ lookup('env','HOME') }}/.ssh/id_ed25519.pub"
+    ssh_private_key: "{{ lookup('env','HOME') }}/.ssh/id_ed25519"
+    kubeconfig_localhost: true
+    ansible_python_interpreter: /usr/bin/python3
+    schedule_on_control_plane: true
+    kube_network_plugin: calico
+    kube_network_plugin_multus: true
+    dpu_mtu: 9000
+    calico_mtu: 8900
+    pam_limits:
+      - domain: "*"
+        type: soft
+        item: nofile
+        value: 65535
+      - domain: "*"
+        type: hard
+        item: nofile
+        value: 65535
+
+  hosts:
+    worker1:
+      ansible_host: 192.168.68.104
+      ansible_user: mwiget
+      ansible_become: true
+      ip: 192.168.68.104
+      access_ip: 192.168.68.104
+      additional_sysctl:
+        - name: fs.inotify.max_user_watches
+          value: 524288
+        - name: fs.inotify.max_user_instances
+          value: 8192
+        - name: fs.inotify.max_queued_events
+          value: 16384
+
+    worker1-dpu:
+      ansible_host: 192.168.68.79
+      ansible_user: ubuntu
+      ansible_become: true
+      ip: 192.168.68.79
+      access_ip: 192.168.68.79
+      node_labels:
+        "app": "f5-tmm"
+      node_taints:
+        - "dpu=true:NoSchedule"
+
+    worker2:
+      ansible_host: 192.168.68.101
+      ansible_user: mwiget
+      ansible_become: true
+      ip: 192.168.68.101
+      access_ip: 192.168.68.101
+      additional_sysctl:
+        - name: fs.inotify.max_user_watches
+          value: 524288
+        - name: fs.inotify.max_user_instances
+          value: 8192
+        - name: fs.inotify.max_queued_events
+          value: 16384
+
+    worker2-dpu:
+      ansible_host: 192.168.68.96
+      ansible_user: ubuntu
+      ansible_become: true
+      ip: 192.168.68.96
+      access_ip: 192.168.68.96
+      node_labels:
+        "app": "f5-tmm"
+      node_taints:
+        - "dpu=true:NoSchedule"
+
+  children:
+    kube_control_plane:
+      hosts:
+        worker1: {}
+
+    kube_node:
+      hosts:
+        worker1: {}
+        worker1-dpu: {}
+        worker2: {}
+        worker2-dpu: {}
+
+    doca_node:
+      hosts:
+        worker1: {}
+        worker2: {}
+
+    etcd:
+      hosts:
+        worker1: {}
+
+    k8s_cluster:
+      children:
+        kube_control_plane: {}
+        kube_node: {}
