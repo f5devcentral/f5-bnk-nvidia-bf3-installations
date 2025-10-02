@@ -45,12 +45,12 @@
         BFB_CONFIG: "{{ bfb_config_dir }}/{{ inventory_hostname }}-dpu.conf"
         bfb_image_path: "{{ bfb_image_dir }}/{{ bfb_image }}"
 
-    # Decide MTU once (prefer MTU, else calico_mtu, else 9000)
+    # Decide dpu_mt once (prefer dpu_mt, else calico_mtu, else 9000)
     - name: Decide DPU MTU
       ansible.builtin.set_fact:
         dpu_mtu: >-
-          {{ (MTU
-              if (MTU is defined and (MTU | string | length) > 0)
+          {{ (dpu_mtu
+              if (dpu_mtu is defined and (dpu_mtu | string | length) > 0)
               else (calico_mtu
                     if (calico_mtu is defined and (calico_mtu | string | length) > 0)
                     else 9000)) | int }}
@@ -65,7 +65,7 @@
         fail_msg: >-
           Missing required variables for templating.
           Ensure DPU_UBUNTU_PASSWORD_HASH is set (or export DPU_UBUNTU_PASSWORD to derive it),
-          and MTU (or calico_mtu) is defined.
+          and dpu_mtu (or calico_mtu) is defined.
         quiet: true
 
     # Compute a stable absolute path for artifacts under the inventory's artifacts dir
@@ -80,11 +80,6 @@
         src: "{{ playbook_dir }}/../dpu/bf-template.conf"
         dest: "{{ BFB_CONFIG }}"             # e.g., /var/tmp/<node>-dpu.conf
         mode: "0600"
-      vars:
-        HOSTNAME: "{{ bfb_hostname }}"
-        MTU: "{{ dpu_mtu }}"
-        MTU_RENDERED: "{{ dpu_mtu }}"
-        DPU_UBUNTU_PASSWORD_HASH: "{{ DPU_UBUNTU_PASSWORD_HASH }}"
       check_mode: no
 
     # Make a local folder on the controller to collect configs (create first!)
