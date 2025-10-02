@@ -1,0 +1,98 @@
+apiVersion: charts.k8s.f5net.com/v1alpha1
+kind: SPKInstance
+metadata:
+  name: bnk-dpu
+  namespace: default
+spec:
+  controller:
+    watchNamespace: red,blue
+  cwc:
+    persistence:
+      enabled: true
+      size: 20Gi
+    cpclConfig:
+      jwt: <replace-with-jwt-token>
+      operationMode: connected
+  global:
+    certmgr:
+      issuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: bnk-ca-cluster-issuer
+    imagePullSecrets:
+    - name: far-secret
+    imageRepository: repo.f5.com/images
+    logging:
+      fluentbitSidecar:
+        enabled: true
+        fluentd:
+          host: f5-toda-fluentd.f5-utils.svc.cluster.local
+          port: "54321"
+  spkInfrastructure: bnk-dpu-infra
+  spkManifest: unused
+  afm:
+    enabled: true
+    pccd:
+      enabled: true
+      blob:
+        maxFwBlobSizeMb: "512"
+        maxNatBlobSizeMb: "512"
+  tmm:
+    replicaCount: 1
+    nodeAssign:
+      nodeSelector:
+        app: f5-tmm
+      tolerations:
+        - key: "dpu"
+          value: "true"
+          operator: "Equal"
+    palCPUSet: "8-15"
+    usePhysMem: true
+    tmmMapresHugepages: 6144
+    resources:
+      limits:
+        cpu: "8"
+        hugepages-2Mi: 13Gi 
+        memory: 2Gi
+    debug:
+      enabled: true
+      resources:
+        limits:
+          cpu: 200m
+          memory: 100Mi
+        requests:
+          cpu: 200m
+          memory: 100Mi
+    xnetDPDKAllow:
+    - auxiliary:mlx5_core.sf.4,dv_flow_en=2
+    - auxiliary:mlx5_core.sf.5,dv_flow_en=2
+    blobd:
+      enabled: true
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+    dynamicRouting:
+      enabled: false
+      configMapName: spk-bgp
+    tmrouted:
+      resources:
+        limits:
+          cpu: "300m"
+          memory: "512Mi"
+        requests:
+          cpu: "300m"
+          memory: "512Mi"
+    tmmRouting:
+      resources:
+        limits:
+          cpu: "700m"
+          memory: "512Mi"
+        requests:
+          cpu: "700m"
+          memory: "512Mi"
+    sessiondb:
+      useExternalStorage: "true"

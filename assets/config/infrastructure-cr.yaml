@@ -1,0 +1,26 @@
+apiVersion: charts.k8s.f5net.com/v1alpha1
+kind: SPKInfrastructure
+metadata:
+  name: bnk-dpu-infra
+spec:
+  networkAttachment:
+  - name: default/sf-external
+  - name: default/sf-internal
+  platformType: other
+  hugepages: true
+  sriovResources:
+    nvidia.com/bf3_p0_sf: "1"
+    nvidia.com/bf3_p1_sf: "1"
+  wholeClusterMode: "enabled"
+  calicoRouter: "default"
+  egress:
+    json:
+      ipPoolCidrInfo:
+        cidrList:
+        - name: vlan_cidr
+          value: "192.168.20.0/24"
+        - name: vlan_ipv6_cidr
+          value: "2001::192:168:20:0/112"
+        ipPoolList:
+        - name: default-ipv4-ippool
+          value: "10.244.0.0/16"
