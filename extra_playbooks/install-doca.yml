@@ -15,6 +15,7 @@
       - curl
       - jq
       - htop
+      - nfs-common
 
   tasks:
     # --- Cleanup: remove any conflicting legacy entries/keys ---

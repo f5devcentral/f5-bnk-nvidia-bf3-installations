@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: prometheus
+spec:
+  secretName: prometheus-secret
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: bnk-ca-cluster-issuer
+  duration: 8640h
+  privateKey:
+    rotationPolicy: Always
+    encoding: PKCS1
+    algorithm: RSA
+    size: 4096
+  revisionHistoryLimit: 10
+  commonName: f5net.com

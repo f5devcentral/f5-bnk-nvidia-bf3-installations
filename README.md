@@ -17,6 +17,8 @@ Updated here for Version v2.1.0
 - Public Internet access from DPU and Ubuntu servers
 - DHCP service on mgmt network for DPU OOB port. The server and DPU IP addresses must be set in
 inventory/f5-bnk-cluster/hosts.yml 
+- Valid NFS server and path, defined in hosts.yml
+- valid JWT token and f5-far-auth-key.tgz, defined in hosts.yml
 
 ## Deployment
 
@@ -88,11 +90,7 @@ $ ls inventory/f5-bnk-cluster/artifacts/dpu-configs/
 worker1-dpu.conf        worker2-dpu.conf
 ```
 
-Once completed, ssh into both DPUs. While the provided ssh public key will grant you passwordless entry, you need 
-to manage the changed host key, e.g. by removing stale entries from ~/.ssh/known_hosts or simply removing that file.
-The example takes advantage of definitions in ~/.ssh/config. Use IP addresses instead.
-
-Repeat for all imaged DPUs as creating the cluster on server and DPU will require password-less entry.
+Once completed, ssh into each DPU. Access is granted without asking for a password now.
 
 Verify that DPU LAG interface bond0 is up and both member links are active:
 
@@ -158,6 +156,34 @@ worker1       Ready    control-plane   3m36s   v1.32.8   192.168.68.104   <none>
 worker1-dpu   Ready    <none>          2m47s   v1.32.8   192.168.68.79    <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
 worker2       Ready    <none>          3m      v1.32.8   192.168.68.101   <none>        Ubuntu 22.04.5 LTS   5.15.0-157-generic      containerd://2.0.6
 Worker2-dpu   Ready    <none>          2m47s   v1.32.8   192.168.68.96    <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
+```
+
+### Deploy BNK 
+
+This adds all relevant components for BNK to the cluster like sriov nfs storage etc
+
+```
+$ make bnk
+```
+
+### Deploy BNK Gateway Class
+
+```
+$ make bnk-gateway-class
+
+TASK [Print f5-spk-vlans table nicely] **************************************************************************************************************************************************************************
+ok: [localhost] => (item=NAME       READY   MESSAGE                                AGE) => {
+    "msg": "NAME       READY   MESSAGE                                AGE"
+}
+ok: [localhost] => (item=external   True    CR config sent to all grpc endpoints   21m) => {
+    "msg": "external   True    CR config sent to all grpc endpoints   21m"
+}
+ok: [localhost] => (item=internal   True    CR config sent to all grpc endpoints   21m) => {
+    "msg": "internal   True    CR config sent to all grpc endpoints   21m"
+}
+
+PLAY RECAP ******************************************************************************************************************************************************************************************************
+localhost
 ```
 
 ### Destroy Cluster

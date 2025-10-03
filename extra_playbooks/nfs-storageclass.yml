@@ -1,0 +1,75 @@
+---
+- name: Create NFS StorageClass (nfs.csi.k8s.io)
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    # Override with: -e "nfs_server=10.0.0.10 nfs_server_path=/export/bnk"
+    nfs_server: "192.168.68.8"
+    nfs_server_path: "/share/bnk"
+
+    # Common locations (same pattern as other playbooks)
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+
+    sc_name: "nfs"
+    rendered_manifest: "/tmp/storageclass-nfs.yaml"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Verify kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Run Kubespray first."
+      when: not kc.stat.exists
+
+    - name: Ensure kubectl is available
+      ansible.builtin.command: bash -lc 'command -v kubectl'
+      register: kubectl_check
+      changed_when: false
+      failed_when: kubectl_check.rc != 0
+
+    - name: Basic sanity checks for NFS vars
+      ansible.builtin.assert:
+        that:
+          - (nfs_server | string) | length > 0
+          - (nfs_server_path | string) | length > 0
+        fail_msg: "nfs_server and nfs_server_path must be set (e.g., -e 'nfs_server=1.2.3.4 nfs_server_path=/export/bnk')."
+
+    - name: Render NFS StorageClass manifest
+      ansible.builtin.copy:
+        dest: "{{ rendered_manifest }}"
+        mode: "0644"
+        content: |
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: {{ sc_name }}
+          provisioner: nfs.csi.k8s.io
+          parameters:
+            server: {{ nfs_server }}
+            share: {{ nfs_server_path }}
+          reclaimPolicy: Delete
+          volumeBindingMode: Immediate
+          allowVolumeExpansion: true
+          mountOptions:
+            - hard
+            - nfsvers=4.0
+
+    - name: Apply NFS StorageClass
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ rendered_manifest }}
+      register: apply_out
+      changed_when: "'created' in apply_out.stdout or 'configured' in apply_out.stdout"
+
+    - name: Show StorageClass
+      ansible.builtin.command:
+        cmd: kubectl get storageclass {{ sc_name }} -o yaml
+      changed_when: false

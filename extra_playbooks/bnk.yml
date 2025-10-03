@@ -1,0 +1,223 @@
+---
+- name: Install F5 BNK (FLO) and prerequisites
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    # repo_root = one level above extra_playbooks/
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+
+    # pulled from hosts.yml (with underscores)
+    far_key_tgz: "{{ f5_far_auth_key }}"
+    jwt_file: "{{ f5_jwt_token }}"
+
+    flo_values_default: "flo-value.yaml"
+    flo_values_tst: "flo-value-tst.yaml"
+    flo_values_rendered: "/tmp/flo-value.yaml"
+
+    far_secret_file: "{{ lookup('env','HOME') }}/far/far-secret.yaml"
+
+    candidate_resource_dirs:
+      - "{{ playbook_dir }}/resources"
+      - "{{ repo_root }}/resources"
+      - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    # --- Pre-checks for critical files ---
+    - name: Verify f5_far_auth_key file exists
+      ansible.builtin.stat:
+        path: "{{ far_key_tgz }}"
+      register: far_key_stat
+
+    - name: Fail if f5_far_auth_key file is missing
+      ansible.builtin.fail:
+        msg: "Required file f5_far_auth_key not found at {{ far_key_tgz }}"
+      when: not far_key_stat.stat.exists
+
+    - name: Verify f5_jwt_token file exists
+      ansible.builtin.stat:
+        path: "{{ jwt_file }}"
+      register: jwt_stat
+
+    - name: Fail if f5_jwt_token file is missing
+      ansible.builtin.fail:
+        msg: "Required file f5_jwt_token not found at {{ jwt_file }}"
+      when: not jwt_stat.stat.exists
+
+    - name: Check kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Run Kubespray first."
+      when: not kc.stat.exists
+
+    - name: Ensure required CLIs are available
+      ansible.builtin.shell: |
+        set -euo pipefail
+        command -v kubectl
+        command -v helm
+        command -v tar
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # --- Locate resources dir ---
+    - name: Probe candidate resources dirs
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ candidate_resource_dirs }}"
+      register: _res_dirs
+
+    - name: Compute first existing resources dir (if any)
+      ansible.builtin.set_fact:
+        _autodetected_resources_dir: >-
+          {{
+            (_res_dirs.results
+             | selectattr('stat.exists')
+             | selectattr('stat.isdir')
+             | map(attribute='stat.path')
+             | list
+            )[0]
+          }}
+      when: >
+        (_res_dirs.results
+         | selectattr('stat.exists')
+         | selectattr('stat.isdir')
+         | list
+        ) | length > 0
+
+    - name: Determine final resources_dir (allow -e override)
+      ansible.builtin.set_fact:
+        resources_dir: "{{ resources_dir | default(_autodetected_resources_dir, true) }}"
+
+    - name: Assert resources_dir is available
+      ansible.builtin.assert:
+        that: [ "resources_dir is defined" ]
+        fail_msg: >-
+          Could not find a resources/ directory. Searched:
+          {{ candidate_resource_dirs | join(', ') }}.
+          Create one or override with -e "resources_dir=/abs/path".
+
+    # --- Helm login using FAR key tgz ---
+    - name: Helm login to repo.f5.com with cne_pull_64.json from tgz
+      ansible.builtin.shell: |
+        set -euo pipefail
+        tar zxfO "{{ far_key_tgz }}" cne_pull_64.json \
+          | helm registry login -u _json_key_base64 --password-stdin https://repo.f5.com
+      args:
+        executable: /bin/bash
+      register: helm_login
+      changed_when: "'Login Succeeded' in (helm_login.stdout + helm_login.stderr)"
+      failed_when: helm_login.rc != 0
+
+    # --- Namespaces ---
+    - name: Ensure namespaces exist
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl get ns f5-utils     >/dev/null 2>&1 || kubectl create ns f5-utils
+        kubectl get ns f5-operators >/dev/null 2>&1 || kubectl create ns f5-operators
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # --- FAR secret ---
+    - name: Verify FAR secret file exists
+      ansible.builtin.stat:
+        path: "{{ far_secret_file }}"
+      register: farsec
+
+    - name: Fail if FAR secret file missing
+      ansible.builtin.fail:
+        msg: "Missing FAR secret file at {{ far_secret_file }}"
+      when: not farsec.stat.exists
+
+    - name: Apply FAR secret to target namespaces
+      ansible.builtin.command:
+        cmd: kubectl -n {{ item }} apply -f {{ far_secret_file }}
+      loop:
+        - default
+        - f5-utils
+        - f5-operators
+
+    # --- OTEL certificate (prereq) ---
+    - name: Apply otel-cert.yaml
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/otel-cert.yaml
+
+    # --- Decide FLO values file based on JWT header ---
+    - name: Read JWT (entire token)
+      ansible.builtin.set_fact:
+        jwt_raw: "{{ lookup('file', jwt_file) | trim }}"
+
+    - name: Extract JWT header (base64url segment #1)
+      ansible.builtin.set_fact:
+        jwt_header_b64url: "{{ (jwt_raw.split('.'))[0] | default('') }}"
+
+    - name: Convert base64url → base64 (pad as needed)
+      ansible.builtin.set_fact:
+        jwt_header_b64: >-
+          {{
+            jwt_header_b64url
+            | regex_replace('-', '+')
+            | regex_replace('_', '/')
+            ~ ('=' * ((4 - (jwt_header_b64url|length % 4)) % 4))
+          }}
+
+    - name: Decode header JSON
+      ansible.builtin.set_fact:
+        jwt_header_json: "{{ jwt_header_b64 | b64decode | default('') }}"
+
+    - name: Decide profile from header (tst vs prod)
+      ansible.builtin.set_fact:
+        jwt_profile: "{{ 'tst' if ('tst' in (jwt_header_json | lower)) else 'prod' }}"
+
+    - name: Pick FLO values file based on profile
+      ansible.builtin.set_fact:
+        _flo_values_src: >-
+          {{
+            (resources_dir + '/' + flo_values_tst)
+            if jwt_profile == 'tst'
+            else (resources_dir + '/' + flo_values_default)
+          }}
+
+    - name: Ensure chosen FLO values file exists
+      ansible.builtin.stat:
+        path: "{{ _flo_values_src }}"
+      register: floval
+
+    - name: Fail if FLO values file missing
+      ansible.builtin.fail:
+        msg: "Missing FLO values file at {{ _flo_values_src }}"
+      when: not floval.stat.exists
+
+    - name: Render FLO values via envsubst (inject JWT)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export JWT="$(cat "{{ jwt_file }}")"
+        envsubst < "{{ _flo_values_src }}" > "{{ flo_values_rendered }}"
+      args:
+        executable: /bin/bash
+
+    # --- Install/Upgrade FLO ---
+    - name: Install/Upgrade F5 Lifecycle Operator (FLO)
+      ansible.builtin.command: >
+        helm upgrade --install flo {{ flo_chart }}
+        --version {{ flo_version }}
+        --namespace f5-operators
+        --create-namespace
+        -f {{ flo_values_rendered }}
+        --wait
+      register: helm_flo
+      changed_when: "'STATUS: deployed' in helm_flo.stdout or 'STATUS: upgraded' in helm_flo.stdout"
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: "BNK/FLO deploy finished."

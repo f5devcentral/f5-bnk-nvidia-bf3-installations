@@ -1,0 +1,76 @@
+---
+- name: Install NFS CSI driver (nfs.csi.k8s.io) via Helm
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    # repo_root = one level above extra_playbooks/
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+
+    # Helm chart settings (override with -e if needed)
+    nfs_helm_repo_name: "csi-driver-nfs"
+    nfs_helm_repo_url: "https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts"
+    nfs_release_name: "csi-driver-nfs"
+    nfs_chart: "csi-driver-nfs/csi-driver-nfs"
+    nfs_namespace: "kube-system"
+
+    # Kubelet dir (Kubespray default is /var/lib/kubelet)
+    kubelet_dir: "/var/lib/kubelet"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Verify kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Run Kubespray first."
+      when: not kc.stat.exists
+
+    - name: Ensure kubectl and helm are available
+      ansible.builtin.shell: |
+        set -euo pipefail
+        command -v kubectl
+        command -v helm
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Add/Update NFS CSI Helm repo
+      ansible.builtin.command:
+        cmd: helm repo add {{ nfs_helm_repo_name }} {{ nfs_helm_repo_url }} --force-update
+      register: repo_add
+      changed_when: "'... already exists' not in (repo_add.stderr | default(''))"
+
+    - name: Helm repo update
+      ansible.builtin.command:
+        cmd: helm repo update
+      changed_when: false
+
+    - name: Install/Upgrade NFS CSI driver
+      ansible.builtin.command: >
+        helm upgrade --install {{ nfs_release_name }} {{ nfs_chart }}
+        --namespace {{ nfs_namespace }}
+        --create-namespace
+        --set kubeletDir={{ kubelet_dir }}
+        --wait
+      register: helm_out
+      changed_when: "'STATUS: deployed' in helm_out.stdout or 'STATUS: upgraded' in helm_out.stdout"
+
+    - name: Verify CSIDriver object exists
+      ansible.builtin.command:
+        cmd: kubectl get csidrivers.storage.k8s.io nfs.csi.k8s.io
+      register: csidr
+      changed_when: false
+      failed_when: csidr.rc != 0
+
+    - name: Show NFS CSI pods (controller & node)
+      ansible.builtin.command:
+        cmd: kubectl -n {{ nfs_namespace }} get pods -l app.kubernetes.io/name=csi-driver-nfs -o wide
+      changed_when: false

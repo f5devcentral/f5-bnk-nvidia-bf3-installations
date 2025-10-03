@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: f5-tmm-dynamic-routing-template
+data:
+  ZebOS.conf: |
+    router bgp 65202
+      !
+      bgp router-id %%POD_IP%%
+      bgp log-neighbor-changes
+      bgp graceful-restart restart-time 120
+      no bgp default ipv4-unicast
+      redistribute kernel
+      !
+      neighbor 192.0.2.62 remote-as 65200
+      neighbor 2001::192:0:2:62 remote-as 65201
+      neighbor 192.0.2.73 remote-as 65200
+      neighbor 2001::192:0:2:73 remote-as 65201
+      !
+      !
+      address-family ipv6
+        redistribute kernel
+        neighbor 2001::192:0:2:62 activate
+        neighbor 2001::192:0:2:62 soft-reconfiguration inbound
+        neighbor 2001::192:0:2:73 activate
+        neighbor 2001::192:0:2:73 soft-reconfiguration inbound
+      exit-address-family
+      !
+      address-family ipv4
+        neighbor 192.0.2.62 activate
+        neighbor 192.0.2.62 soft-reconfiguration inbound
+        neighbor 192.0.2.73 activate
+        neighbor 192.0.2.73 soft-reconfiguration inbound
+      exit-address-family
+    !

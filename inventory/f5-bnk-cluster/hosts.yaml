@@ -1,18 +1,32 @@
 all:
   vars:
+    f5_far_auth_key: "{{ lookup('env','HOME') }}/far/f5-far-auth-key.tgz"
+    f5_jwt_token: "{{ lookup('env','HOME') }}/.jwt"
+    flo_chart: "oci://repo.f5.com/charts/f5-lifecycle-operator"
+    flo_version: "v1.198.4-0.1.36"
+
+    internal_network: "198.18.100.0/24"   # high speed east-west worker node network
+    nfs_server: "192.168.68.8"
+    nfs_server_path: "/share/bnk"
+
     doca_version: 2.9.2
     bfb_image: "bf-bundle-2.9.2-32_25.02_ubuntu-22.04_prod.bfb"
+
     bfb_url_base: "https://content.mellanox.com/BlueField/BFBs/Ubuntu22.04"
     dpu_ubuntu_password: "{{ lookup('env', 'DPU_UBUNTU_PASSWORD_HASH') }}"
+
     ssh_pubkey_path: "{{ lookup('env','HOME') }}/.ssh/id_ed25519.pub"
     ssh_private_key: "{{ lookup('env','HOME') }}/.ssh/id_ed25519"
-    kubeconfig_localhost: true
+
     ansible_python_interpreter: /usr/bin/python3
     schedule_on_control_plane: true
     kube_network_plugin: calico
     kube_network_plugin_multus: true
+    kubeconfig_localhost: true
+
     dpu_mtu: 9000
     calico_mtu: 8900
+
     pam_limits:
       - domain: "*"
         type: soft

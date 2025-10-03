@@ -1,0 +1,268 @@
+---
+- name: Configure BNK GatewayClass (node annotations, VLANs, BGP/ZebOS)
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    # repo_root = one level above extra_playbooks/
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+
+    # Candidate locations to search (first existing wins)
+    candidate_resource_dirs:
+      - "{{ playbook_dir }}/resources"
+      - "{{ repo_root }}/resources"
+      - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
+
+    # Manifests used by the script
+    bnkgwc_manifest: "bnk-gateway-class.yaml"
+    vlans_manifest: "vlans.yaml"
+    zebos_cm_manifest: "zebos-bgp-cm.yaml"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    # --- Sanity checks ---
+    - name: Ensure required CLIs exist (kubectl, ssh)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        command -v kubectl
+        command -v ssh
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Verify kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: _kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Run Kubespray first."
+      when: not _kc.stat.exists
+
+    # --- Locate resources dir (robust like your other playbooks) ---
+    - name: Probe candidate resources dirs
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ candidate_resource_dirs }}"
+      register: _res_dirs
+
+    - name: Compute first existing resources dir (if any)
+      ansible.builtin.set_fact:
+        _autodetected_resources_dir: >-
+          {{
+            (_res_dirs.results
+             | selectattr('stat.exists')
+             | selectattr('stat.isdir')
+             | map(attribute='stat.path')
+             | list
+            )[0]
+          }}
+      when: >
+        (_res_dirs.results
+         | selectattr('stat.exists')
+         | selectattr('stat.isdir')
+         | list
+        ) | length > 0
+
+    - name: Determine final resources_dir (allow -e override)
+      ansible.builtin.set_fact:
+        resources_dir: "{{ resources_dir | default(_autodetected_resources_dir, true) }}"
+
+    - name: Assert resources_dir is available
+      ansible.builtin.assert:
+        that: [ "resources_dir is defined" ]
+        fail_msg: >-
+          Could not find a resources/ directory. Searched:
+          {{ candidate_resource_dirs | join(', ') }}.
+          Create one or override with -e "resources_dir=/abs/path".
+
+    # --- List non-DPU nodes (like: kubectl get nodes -o name | grep -v dpu | cut -d/ -f2) ---
+    - name: Get all node names
+      ansible.builtin.command:
+        cmd: kubectl get nodes -o name
+      register: _nodes
+      changed_when: false
+
+    - name: Build filtered node list (exclude names containing 'dpu')
+      ansible.builtin.set_fact:
+        nodes_filtered: >-
+          {{
+            _nodes.stdout_lines
+            | map('regex_replace','^node/','')
+            | reject('search','dpu')
+            | list
+          }}
+
+    - name: Show nodes to annotate
+      ansible.builtin.debug:
+        var: nodes_filtered
+
+    # --- For each node: get InternalIP and derive interface for INTERNAL_NETWORK via ssh ---
+    - name: Lookup InternalIP for each node
+      ansible.builtin.command:
+        cmd: kubectl get node {{ item }} -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}'
+      loop: "{{ nodes_filtered }}"
+      register: _node_ips
+      changed_when: false
+
+    - name: Build mapping node -> InternalIP
+      ansible.builtin.set_fact:
+        node_ip_map: >-
+          {{
+            dict( nodes_filtered | zip(_node_ips.results | map(attribute='stdout') | map('trim') | list) )
+          }}
+
+    - name: Determine primary interface per node (via ssh ip route get {{ internal_network }})
+      ansible.builtin.shell: |
+        set -euo pipefail
+        ip route get {{ internal_network }} 2>/dev/null | awk '/ dev /{print $5; exit}'
+      args:
+        executable: /bin/bash
+      loop: "{{ node_ip_map | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      delegate_to: "{{ item.value }}"
+      register: _if_query
+      changed_when: false
+      vars:
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o BatchMode=yes"
+
+    - name: Build mapping node -> iface
+      ansible.builtin.set_fact:
+        node_iface_map: >-
+          {{
+            dict(
+              _if_query.results
+              | map(attribute='item')
+              | map(attribute='key')
+              | list
+              | zip(
+                  _if_query.results
+                  | map(attribute='stdout')
+                  | map('trim')
+                  | list
+                )
+            )
+          }}
+
+    - name: Annotate nodes with k8s.ovn.org/node-primary-ifaddr
+      ansible.builtin.command: >
+        kubectl annotate node {{ item.key }}
+        k8s.ovn.org/node-primary-ifaddr={{ item.value }}
+        --overwrite
+      loop: "{{ node_iface_map | dict2items }}"
+      when:
+        - (item.value | default('')) | length > 0
+
+    # --- Apply BNKGatewayClass ---
+    - name: Verify BNKGatewayClass manifest exists
+      ansible.builtin.stat:
+        path: "{{ resources_dir }}/{{ bnkgwc_manifest }}"
+      register: _bnkgwc
+
+    - name: Fail if BNKGatewayClass manifest missing
+      ansible.builtin.fail:
+        msg: "Missing {{ resources_dir }}/{{ bnkgwc_manifest }}"
+      when: not _bnkgwc.stat.exists
+
+    - name: Apply BNKGatewayClass manifest
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/{{ bnkgwc_manifest }}
+
+    # --- Apply VLANs with retry (like 'until kubectl apply ...; sleep 5') ---
+    - name: Verify VLANs manifest exists
+      ansible.builtin.stat:
+        path: "{{ resources_dir }}/{{ vlans_manifest }}"
+      register: _vlans
+
+    - name: Fail if VLANs manifest missing
+      ansible.builtin.fail:
+        msg: "Missing {{ resources_dir }}/{{ vlans_manifest }}"
+      when: not _vlans.stat.exists
+
+    - name: Apply VLANs manifest with retry
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/{{ vlans_manifest }}
+      register: _apply_vlans
+      retries: 12          # ~1 minute total
+      delay: 5
+      until: _apply_vlans.rc == 0
+
+    # --- Apply ZebOS BGP ConfigMap ---
+    - name: Verify ZebOS BGP ConfigMap manifest exists
+      ansible.builtin.stat:
+        path: "{{ resources_dir }}/{{ zebos_cm_manifest }}"
+      register: _zebos
+
+    - name: Fail if ZebOS BGP manifest missing
+      ansible.builtin.fail:
+        msg: "Missing {{ resources_dir }}/{{ zebos_cm_manifest }}"
+      when: not _zebos.stat.exists
+
+    - name: Apply ZebOS BGP ConfigMap
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/{{ zebos_cm_manifest }}
+
+    # --- Optional: run the validation script if present ---
+    - name: Check for scripts/check-f5-spk-vlans.sh
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/scripts/check-f5-spk-vlans.sh"
+      register: _check_script
+
+    - name: Run check-f5-spk-vlans.sh
+      ansible.builtin.command:
+        cmd: bash {{ repo_root }}/scripts/check-f5-spk-vlans.sh
+      when: _check_script.stat.exists
+
+    # --- Apply manifests (already in your playbook) ---
+    - name: Apply BNK GatewayClass, VLANs, ZebOS manifests
+      ansible.builtin.command: >
+        kubectl apply -f {{ resources_dir }}/{{ item }}
+      loop:
+        - bnk-gateway-class.yaml
+        - vlans.yaml
+        - zebos-bgp-cm.yaml
+      register: apply_out
+      changed_when: "'created' in apply_out.stdout or 'configured' in apply_out.stdout"
+
+    # --- Wait for f5-spk-vlans to exist ---
+    - name: Wait until f5-spk-vlans exist
+      ansible.builtin.command:
+        cmd: kubectl get f5-spk-vlans -o json
+      register: vlan_exist
+      retries: 30
+      delay: 5
+      until: >
+        vlan_exist.rc == 0 and
+        (((vlan_exist.stdout | from_json)['items'] | length) > 0)
+      changed_when: false
+
+    - name: Wait until at least one f5-spk-vlans shows 'CR config sent to all grpc endpoints'
+      ansible.builtin.shell: |
+        set -euo pipefail
+        # non-yaml output; succeed when the phrase appears at least once
+        kubectl get f5-spk-vlans | grep -q 'CR config sent to all grpc endpoints'
+      args:
+        executable: /bin/bash
+      register: vlan_grep
+      retries: 60      # ~5 minutes
+      delay: 5
+      until: vlan_grep.rc == 0
+      changed_when: false
+      failed_when: false  # let 'until' control success/failure
+
+    - name: Show f5-spk-vlans table (wide)
+      ansible.builtin.command:
+        cmd: kubectl get f5-spk-vlans -o wide
+      register: vlan_table
+      changed_when: false
+
+    - name: Print f5-spk-vlans table nicely
+      ansible.builtin.debug:
+        msg: "{{ item }}"
+      loop: "{{ vlan_table.stdout_lines }}"
