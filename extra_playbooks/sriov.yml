@@ -1,0 +1,44 @@
+---
+- name: Deploy SR-IOV prerequisites and CNI resources
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    # repo_root = one level above extra_playbooks/
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+    resources_dir: "{{ repo_root }}/resources"
+    manifests:
+      - multus.yaml
+      - cni-plugins.yaml
+      - sriovdp-config.yaml
+      - sriov-cni-daemonset.yaml
+      - sriovdp-daemonset.yaml
+      - nad-sf.yaml
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Check kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: >-
+          Kubeconfig not found at {{ kubeconfig_path }}.
+          Run Kubespray first so admin.conf is generated.
+      when: not kc.stat.exists
+
+    - name: Ensure kubectl is available
+      ansible.builtin.command: bash -lc 'command -v kubectl'
+      register: kubectl_check
+      changed_when: false
+      failed_when: kubectl_check.rc != 0
+
+    - name: Apply SR-IOV / Multus manifests in order
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/{{ item }}
+      loop: "{{ manifests }}"

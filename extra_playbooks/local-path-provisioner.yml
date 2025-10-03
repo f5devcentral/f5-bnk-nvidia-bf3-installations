@@ -1,0 +1,80 @@
+---
+- name: Install Rancher local-path-provisioner and set as default StorageClass
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    # repo_root = one level above extra_playbooks/
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+    lpp_manifest_url: "https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml"
+    lpp_namespace: "local-path-storage"
+    lpp_deployment: "local-path-provisioner"
+    storageclass_name: "local-path"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Check kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Run Kubespray first."
+      when: not kc.stat.exists
+
+    - name: Ensure kubectl is available
+      ansible.builtin.command: bash -lc 'command -v kubectl'
+      register: kubectl_check
+      changed_when: false
+      failed_when: kubectl_check.rc != 0
+
+    - name: Apply local-path-provisioner manifest (idempotent)
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ lpp_manifest_url }}
+      register: apply_out
+      changed_when: "'configured' not in apply_out.stdout and 'unchanged' not in apply_out.stdout"
+
+    - name: Wait for local-path-provisioner deployment to be ready
+      ansible.builtin.command:
+        cmd: kubectl -n {{ lpp_namespace }} rollout status deploy/{{ lpp_deployment }} --timeout=120s
+      register: rollout
+      retries: 10
+      delay: 6
+      until: rollout.rc == 0
+      changed_when: false
+
+    - name: Check if StorageClass 'local-path' exists
+      ansible.builtin.command:
+        cmd: kubectl get sc {{ storageclass_name }} -o name
+      register: sc_exists
+      failed_when: sc_exists.rc not in [0,1]
+      changed_when: false
+
+    - name: Wait for StorageClass 'local-path' to appear (post-apply)
+      ansible.builtin.command:
+        cmd: kubectl get sc {{ storageclass_name }} -o name
+      register: sc_wait
+      retries: 10
+      delay: 3
+      until: sc_wait.rc == 0
+      when: sc_exists.rc != 0
+      changed_when: false
+
+    - name: Read current 'is-default-class' annotation
+      ansible.builtin.command:
+        cmd: kubectl get sc {{ storageclass_name }} -o jsonpath='{.metadata.annotations.storageclass\.kubernetes\.io/is-default-class}'
+      register: sc_default
+      failed_when: sc_default.rc not in [0]
+      changed_when: false
+
+    - name: Make 'local-path' the default StorageClass (patch only if needed)
+      ansible.builtin.command:
+        cmd: >
+          kubectl patch storageclass {{ storageclass_name }}
+          -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+      when: sc_default.stdout | default('false') | lower != 'true'

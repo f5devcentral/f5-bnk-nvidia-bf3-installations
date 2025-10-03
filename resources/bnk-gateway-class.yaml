@@ -1,0 +1,76 @@
+apiVersion: k8s.f5.com/v1
+kind: BNKGatewayClass
+metadata:
+  labels:
+    app.kubernetes.io/name: f5-lifecycle-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: bnkgatewayclass-dpu
+spec:
+  manifestVersion: "2.1.0-3.1736.1-0.1.27"
+  storageClassName: "nfs"
+  containerPlatform: Generic
+  telemetry:
+    loggingSubsystem:
+      enabled: false
+    metricSubsystem:
+      enabled: true
+  certificate:
+    clusterIssuer: bnk-ca-cluster-issuer
+      # deploymentSize: "Max"
+  deploymentSize: "Large"
+  image:
+    repository: "repo.f5.com/images"
+    imagePullSecrets:
+    - name: far-secret
+    imagePullPolicy: Always
+  networkAttachments:
+  - sf-external
+  - sf-internal
+     
+  # Features
+  # CSRC Egress
+  pseudoCNI:
+    enabled: true
+  # BGP
+  dynamicRouting:
+    enabled: true
+  # Core dump files
+  coreCollection:
+    enabled: true
+  # AFM
+  firewallACL:
+    enabled: true
+ 
+  advanced:
+    demoMode:
+      enabled: false
+    maintenanceMode:
+      enabled: false
+    envDiscovery:
+      enabled: false
+      stopOnFail: true
+      runAfterSuccess: true
+    cneController:
+      env:
+      - name: "TMM_DEFAULT_MTU"
+        value: "9000"
+    pseudoCNI:
+      env:
+      - name: "EXCLUDE_CIDR"
+        value: "198.18.100.0/24,192.0.2.0/24,192.168.68.0/22"
+    tmm:
+      env:
+      - name: "TMM_CALICO_ROUTER"
+        value: "default"
+      - name: "TMM_DEFAULT_MTU"
+        value: "9000"
+      #      - name: "TMM_LOG_LEVEL"
+      #        value: "Debug" 
+ 
+    #firewallACL:
+    #  env:
+    #  -name: "LOG_LEVEL"
+    #   value: "info"
+ 
+    #cwc:
+    #  env:

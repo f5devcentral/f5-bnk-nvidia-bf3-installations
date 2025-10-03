@@ -1,0 +1,29 @@
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: selfsigned-cluster-issuer
+spec:
+    selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: bnk-ca
+    namespace: cert-manager
+spec:
+    isCA: true
+    commonName: bnk-ca
+    secretName: bnk-ca
+    issuerRef:
+        name: selfsigned-cluster-issuer
+        kind: ClusterIssuer
+        group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+    name: bnk-ca-cluster-issuer
+spec:
+  ca:
+    secretName: bnk-ca

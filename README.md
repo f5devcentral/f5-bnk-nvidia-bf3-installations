@@ -156,6 +156,34 @@ worker2       Ready    <none>          3m      v1.32.8   192.168.68.101   <none>
 Worker2-dpu   Ready    <none>          2m47s   v1.32.8   192.168.68.96    <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
 ```
 
+### Deploy BNK 
+
+This adds all relevant components for BNK to the cluster like sriov nfs storage etc
+
+```
+$ make bnk
+```
+
+### Deploy BNK Gateway Class
+
+```
+$ make bnk-gateway-class
+
+TASK [Print f5-spk-vlans table nicely] **************************************************************************************************************************************************************************
+ok: [localhost] => (item=NAME       READY   MESSAGE                                AGE) => {
+    "msg": "NAME       READY   MESSAGE                                AGE"
+}
+ok: [localhost] => (item=external   True    CR config sent to all grpc endpoints   21m) => {
+    "msg": "external   True    CR config sent to all grpc endpoints   21m"
+}
+ok: [localhost] => (item=internal   True    CR config sent to all grpc endpoints   21m) => {
+    "msg": "internal   True    CR config sent to all grpc endpoints   21m"
+}
+
+PLAY RECAP ******************************************************************************************************************************************************************************************************
+localhost
+```
+
 ### Destroy Cluster
 
 ```

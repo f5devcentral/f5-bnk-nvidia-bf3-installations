@@ -1,0 +1,168 @@
+---
+- name: Install kube-prometheus-stack (Prometheus + Grafana) and expose Grafana
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    # repo_root = one level above extra_playbooks/
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+
+    helm_repo_name: "prometheus-community"
+    helm_repo_url: "https://prometheus-community.github.io/helm-charts"
+    helm_release: "prometheus"
+    helm_chart: "prometheus-community/kube-prometheus-stack"
+    helm_namespace: "monitoring"
+
+    # We’ll compute resources_dir after probing candidates (can also override with -e resources_dir=...)
+    prometheus_cert: "prometheus-cert.yaml"
+    prometheus_values: "prometheus-values.yaml"
+    grafana_service: "grafana-service.yaml"
+
+    candidate_resource_dirs:
+      - "{{ playbook_dir }}/resources"
+      - "{{ repo_root }}/resources"
+      - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Check kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}. Run Kubespray first."
+      when: not kc.stat.exists
+
+    - name: Ensure kubectl is available
+      ansible.builtin.command: bash -lc 'command -v kubectl'
+      register: kubectl_check
+      changed_when: false
+      failed_when: kubectl_check.rc != 0
+
+    - name: Ensure helm is available
+      ansible.builtin.command: bash -lc 'command -v helm'
+      register: helm_check
+      changed_when: false
+      failed_when: helm_check.rc != 0
+
+    # ----- Namespace -----
+    - name: Create namespace if missing (monitoring)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl get ns {{ helm_namespace }} || kubectl create ns {{ helm_namespace }}
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    # ----- Locate resources dir (robust) -----
+    - name: Probe candidate resources dirs
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ candidate_resource_dirs }}"
+      register: _res_dirs
+
+    - name: Compute first existing resources dir (if any)
+      ansible.builtin.set_fact:
+        _autodetected_resources_dir: >-
+          {{
+            (_res_dirs.results
+             | selectattr('stat.exists')
+             | selectattr('stat.isdir')
+             | map(attribute='stat.path')
+             | list
+            )[0]
+          }}
+      when: >
+        (_res_dirs.results
+         | selectattr('stat.exists')
+         | selectattr('stat.isdir')
+         | list
+        ) | length > 0
+
+    - name: Determine final resources_dir (allow -e override)
+      ansible.builtin.set_fact:
+        resources_dir: "{{ resources_dir | default(_autodetected_resources_dir, true) }}"
+
+    - name: Assert resources dir is found (or provided)
+      ansible.builtin.assert:
+        that:
+          - resources_dir is defined
+        fail_msg: >-
+          Could not find a resources/ directory. Searched:
+          {{ candidate_resource_dirs | join(', ') }}.
+          Create one with the needed files, or override with:
+          -e "resources_dir=/absolute/path/to/resources"
+
+    - name: Using resources_dir
+      ansible.builtin.debug:
+        msg: "Using resources_dir={{ resources_dir }}"
+
+    - name: Verify required manifests exist
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - "{{ resources_dir }}/{{ prometheus_cert }}"
+        - "{{ resources_dir }}/{{ prometheus_values }}"
+        - "{{ resources_dir }}/{{ grafana_service }}"
+      register: _mf
+
+    - name: Fail if any required manifest is missing
+      ansible.builtin.fail:
+        msg: >-
+          Missing: {{
+            _mf.results
+            | rejectattr('stat.exists')
+            | map(attribute='stat.path')
+            | list
+            | join(', ')
+          }}
+      when: (_mf.results | rejectattr('stat.exists') | list) | length > 0
+
+    # ----- Apply Prometheus cert (if you use it for ingress/tls) -----
+    - name: Apply prometheus-cert.yaml in monitoring ns
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/{{ prometheus_cert }} -n {{ helm_namespace }}
+
+    # ----- Helm repo + install/upgrade -----
+    - name: Add/Update Prometheus Community Helm repo
+      ansible.builtin.command:
+        cmd: helm repo add {{ helm_repo_name }} {{ helm_repo_url }} --force-update
+      register: repo_add
+      changed_when: "'... already exists' not in (repo_add.stderr | default(''))"
+
+    - name: Helm repo update
+      ansible.builtin.command:
+        cmd: helm repo update
+      changed_when: false
+
+    - name: Install/Upgrade kube-prometheus-stack
+      ansible.builtin.command: >
+        helm upgrade --install {{ helm_release }} {{ helm_chart }}
+        --namespace {{ helm_namespace }}
+        --create-namespace
+        --values {{ resources_dir }}/{{ prometheus_values }}
+        --wait
+      register: helm_out
+      changed_when: "'STATUS: deployed' in helm_out.stdout or 'STATUS: upgraded' in helm_out.stdout"
+
+    # ----- Wait loop like your shell until/retry -----
+    - name: Wait until all pods in monitoring are Ready (retry loop)
+      ansible.builtin.command: >
+        kubectl wait --for=condition=Ready pods --all
+        -n {{ helm_namespace }} --timeout=30s
+      register: wait_out
+      retries: 24
+      delay: 5
+      until: wait_out.rc == 0
+      changed_when: false
+
+    # ----- Grafana service -----
+    - name: Apply grafana-service.yaml in monitoring ns
+      ansible.builtin.command:
+        cmd: kubectl apply -f {{ resources_dir }}/{{ grafana_service }} -n {{ helm_namespace }}

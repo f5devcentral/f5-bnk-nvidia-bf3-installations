@@ -1,0 +1,81 @@
+---
+- name: Clean BNK resources (GatewayClass, VLANs, ZebOS)
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+
+  vars:
+    repo_root: "{{ (playbook_dir + '/..') | realpath }}"
+    kubeconfig_path: "{{ repo_root }}/inventory/f5-bnk-cluster/artifacts/admin.conf"
+
+    candidate_resource_dirs:
+      - "{{ playbook_dir }}/resources"
+      - "{{ repo_root }}/resources"
+      - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
+
+    manifests:
+      - "bnk-gateway-class.yaml"
+      - "vlans.yaml"
+      - "zebos-bgp-cm.yaml"
+
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+
+  tasks:
+    - name: Verify kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kc
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "Kubeconfig not found at {{ kubeconfig_path }}"
+      when: not kc.stat.exists
+
+    # --- locate resources dir ---
+    - name: Probe candidate resources dirs
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ candidate_resource_dirs }}"
+      register: _res_dirs
+
+    - name: Pick first existing resources dir
+      ansible.builtin.set_fact:
+        resources_dir: >-
+          {{
+            (_res_dirs.results
+             | selectattr('stat.exists')
+             | selectattr('stat.isdir')
+             | map(attribute='stat.path')
+             | list
+            )[0]
+          }}
+      when: >
+        (_res_dirs.results
+         | selectattr('stat.exists')
+         | selectattr('stat.isdir')
+         | list) | length > 0
+
+    - name: Assert resources_dir is found
+      ansible.builtin.assert:
+        that: [ resources_dir is defined ]
+        fail_msg: "Could not find a resources/ directory in {{ candidate_resource_dirs | join(', ') }}"
+
+    # --- delete each manifest if present ---
+    - name: Ensure manifests exist (collect)
+      ansible.builtin.stat:
+        path: "{{ resources_dir }}/{{ item }}"
+      loop: "{{ manifests }}"
+      register: _mfiles
+
+    - name: Delete manifests (kubectl delete -f)
+      ansible.builtin.command:
+        cmd: kubectl delete -f {{ item.stat.path }}
+      loop: "{{ _mfiles.results }}"
+      when: item.stat.exists
+      register: delete_results
+      ignore_errors: true
+
+    - name: Show delete results
+      ansible.builtin.debug:
+        var: delete_results.results
