@@ -130,44 +130,57 @@
       changed_when: "'Successfully' in (bfb_install_result.stdout | default('')) or
                      'Successfully' in (bfb_install_result.stderr | default(''))"
 
-    - name: Remove old SSH host keys for DPU {{ bfb_hostname }}
-      ansible.builtin.known_hosts:
-        name: "{{ bfb_hostname }}"
+    - name: Clean up old SSH known_hosts backup file
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts.old"
         state: absent
       delegate_to: localhost
       become: false
+      run_once: true
 
-    - name: Remove old SSH host keys for DPU IP
-      ansible.builtin.command: ssh-keygen -R {{ hostvars[bfb_hostname]['ansible_host'] }}
+    - name: Remove old SSH host keys for DPU {{ bfb_hostname }}
+      ansible.builtin.known_hosts:
+        name: "{{ item }}"
+        state: absent
+        path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
       delegate_to: localhost
       become: false
-      failed_when: false
+      loop:
+        - "{{ bfb_hostname }}"
+        - "{{ hostvars[bfb_hostname]['ansible_host'] }}"
 
-    - name: Wait until DPU {{ bfb_hostname }} is reachable via ping
+    - name: Wait until DPU {{ bfb_hostname }} is reachable via SSH
       ansible.builtin.wait_for:
-        host: "{{ bfb_hostname }}"
-        port: 22            # Wait for SSH port (better than raw ICMP)
-        delay: 5            # Initial delay before first try
-        timeout: 900        # Total seconds to wait (15 minutes)
+        host: "{{ hostvars[bfb_hostname]['ansible_host'] }}"
+        port: 22
+        delay: 5
+        timeout: 900
         state: started
       delegate_to: localhost
       become: false
 
-    - name: Install our controller’s SSH public key on the DPU
+    - name: Install our controller's SSH public key on the DPU
       ansible.builtin.command: >
         sshpass -p "{{ DPU_UBUNTU_PASSWORD }}"
         ssh-copy-id
         -i {{ ssh_pubkey_path }}
         -o StrictHostKeyChecking=no
-        ubuntu@{{ bfb_hostname }}
+        -o UserKnownHostsFile=/dev/null
+        ubuntu@{{ hostvars[bfb_hostname]['ansible_host'] }}
       delegate_to: localhost
       become: false
 
-    - name: Accept new SSH host key for DPU {{ bfb_hostname }}
-      ansible.builtin.command: >
-        ssh-keyscan -H {{ bfb_hostname }} >> {{ lookup('env', 'HOME') }}/.ssh/known_hosts
+    - name: Add new SSH host key for DPU
+      ansible.builtin.known_hosts:
+        name: "{{ item }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan -H ' + item) }}"
+        state: present
+        path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
       delegate_to: localhost
       become: false
+      loop:
+        - "{{ bfb_hostname }}"
+        - "{{ hostvars[bfb_hostname]['ansible_host'] }}"
 
   handlers:
     - name: Show BFB config path
