@@ -130,11 +130,24 @@
       changed_when: "'Successfully' in (bfb_install_result.stdout | default('')) or
                      'Successfully' in (bfb_install_result.stderr | default(''))"
 
+    - name: Remove old SSH host keys for DPU {{ bfb_hostname }}
+      ansible.builtin.known_hosts:
+        name: "{{ bfb_hostname }}"
+        state: absent
+      delegate_to: localhost
+      become: false
+
+    - name: Remove old SSH host keys for DPU IP
+      ansible.builtin.command: ssh-keygen -R {{ hostvars[bfb_hostname]['ansible_host'] }}
+      delegate_to: localhost
+      become: false
+      failed_when: false
+
     - name: Wait until DPU {{ bfb_hostname }} is reachable via ping
       ansible.builtin.wait_for:
         host: "{{ bfb_hostname }}"
         port: 22            # Wait for SSH port (better than raw ICMP)
-        delay: 30           # Initial delay before first try
+        delay: 5            # Initial delay before first try
         timeout: 900        # Total seconds to wait (15 minutes)
         state: started
       delegate_to: localhost
@@ -146,8 +159,13 @@
         ssh-copy-id
         -i {{ ssh_pubkey_path }}
         -o StrictHostKeyChecking=no
-        -o UserKnownHostsFile=/dev/null
         ubuntu@{{ bfb_hostname }}
+      delegate_to: localhost
+      become: false
+
+    - name: Accept new SSH host key for DPU {{ bfb_hostname }}
+      ansible.builtin.command: >
+        ssh-keyscan -H {{ bfb_hostname }} >> {{ lookup('env', 'HOME') }}/.ssh/known_hosts
       delegate_to: localhost
       become: false
 

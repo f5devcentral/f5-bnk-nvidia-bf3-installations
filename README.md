@@ -88,11 +88,7 @@ $ ls inventory/f5-bnk-cluster/artifacts/dpu-configs/
 worker1-dpu.conf        worker2-dpu.conf
 ```
 
-Once completed, ssh into both DPUs. While the provided ssh public key will grant you passwordless entry, you need 
-to manage the changed host key, e.g. by removing stale entries from ~/.ssh/known_hosts or simply removing that file.
-The example takes advantage of definitions in ~/.ssh/config. Use IP addresses instead.
-
-Repeat for all imaged DPUs as creating the cluster on server and DPU will require password-less entry.
+Once completed, ssh into each DPU. Access is granted without asking for a password now.
 
 Verify that DPU LAG interface bond0 is up and both member links are active:
 
