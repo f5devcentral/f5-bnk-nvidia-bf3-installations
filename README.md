@@ -17,6 +17,8 @@ Updated here for Version v2.1.0
 - Public Internet access from DPU and Ubuntu servers
 - DHCP service on mgmt network for DPU OOB port. The server and DPU IP addresses must be set in
 inventory/f5-bnk-cluster/hosts.yml 
+- Valid NFS server and path, defined in hosts.yml
+- valid JWT token and f5-far-auth-key.tgz, defined in hosts.yml
 
 ## Deployment
 
