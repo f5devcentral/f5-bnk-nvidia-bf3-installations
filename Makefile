@@ -56,7 +56,7 @@ bnk: sriov local-path-provisioner nfs-csi nfs-storageclass cert-manager grafana 
 		extra_playbooks/bnk.yml
 
 .PHONY: bnk-gateway-class
-bnk-gateway-class:
+bnk-gateway-class: bnk
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/bnk-gateway-class.yml
 
