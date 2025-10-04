@@ -30,17 +30,6 @@ data:
                 "pfNames": ["p1#1"],
                 "auxTypes": ["sf"]
                 }]
-            },
-            {
-              "resourceName": "bf3_p0_vf",
-              "resourcePrefix": "nvidia.com",
-              "deviceType": "netDevice",
-               "selectors": [{
-                  "vendors": ["15b3"],
-                  "devices": ["101e"],
-                  "drivers": ["mlx5_core"],
-                  "pfNames": ["enp193s0f0np0"]
-                }]
             }
             ]
     }
