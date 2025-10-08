@@ -1,4 +1,4 @@
-KS_VERSION ?= $(shell cat .kubespray-version)
+S_VERSION ?= $(shell cat .kubespray-version)
 INV ?= inventory/f5-bnk-cluster
 KS_DIR ?= .deps/kubespray
 
@@ -56,12 +56,13 @@ bnk: sriov local-path-provisioner nfs-csi nfs-storageclass cert-manager grafana 
 		extra_playbooks/bnk.yml
 
 .PHONY: bnk-gateway-class
-bnk-gateway-class: bnk
+bnk-gateway-class:
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/bnk-gateway-class.yml
 
-.PHONY: clean-bnk
-clean-bnk:
+.PHONY: clean
+clean:
+	@echo "removing bnk gateway class ..."
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/clean-bnk.yml
 
