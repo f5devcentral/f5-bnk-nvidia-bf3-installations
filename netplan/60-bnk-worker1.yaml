@@ -1,0 +1,26 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+
+    ens16f0np0: 
+      dhcp4: no
+      dhcp6: no
+      mtu: 9000
+
+  vlans:
+    internal:
+      id: 200
+      link: ens16f0np0
+      mtu: 8996
+      addresses:
+        - 198.18.100.11/24
+        - 2001::198:18:100:11/64
+    external:
+      id: 210
+      link: ens16f0np0
+      mtu: 8996
+      addresses:
+        - 192.0.2.11/24
+        - 2001::192:0:2:11/64
+
