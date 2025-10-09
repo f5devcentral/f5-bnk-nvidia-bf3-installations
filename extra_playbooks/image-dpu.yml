@@ -158,19 +158,39 @@
         path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
       delegate_to: localhost
       become: false
+      run_once: true
       loop:
         - "{{ bfb_hostname }}"
         - "{{ hostvars[bfb_hostname]['ansible_host'] }}"
 
-    - name: Wait until DPU {{ bfb_hostname }} is reachable via SSH
+    - name: Resolve DPU {{ bfb_hostname }} address
+      ansible.builtin.set_fact:
+        _dpu_addr: "{{ hostvars[bfb_hostname].ansible_host | default(bfb_hostname) }}"
+
+    - name: Verify where this will run from
+      ansible.builtin.debug:
+        msg: "Probing {{ _dpu_addr }}:22 from {{ inventory_hostname }} (override any inherited delegation)"
+
+    - name: Show target used for wait_for
+      ansible.builtin.debug:
+        msg: "Waiting for SSH on {{ _dpu_addr }}:22"
+
+    # Force the probe to run from the worker (or another reachable hop),
+    # not from localhost and not from an inherited delegate.
+    - name: Wait for SSH on {{ bfb_hostname }} (fast retry, run from worker)
       ansible.builtin.wait_for:
-        host: "{{ hostvars[bfb_hostname]['ansible_host'] }}"
+        host: "{{ _dpu_addr }}"
         port: 22
-        delay: 5
-        timeout: 900
+        connect_timeout: 3
+        timeout: 12
+        sleep: 2
         state: started
-      delegate_to: localhost
+      delegate_to: "{{ inventory_hostname }}"   # override inherited 'localhost'
       become: false
+      register: ssh_wait
+      retries: 20
+      delay: 3
+      until: ssh_wait is succeeded
 
     - name: Install our controller's SSH public key on the DPU
       ansible.builtin.command: >
