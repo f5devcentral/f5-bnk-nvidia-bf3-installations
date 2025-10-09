@@ -22,7 +22,8 @@ inventory/f5-bnk-cluster/hosts.yml
 
 ## Deployment
 
-Check/set inventory/f5-bnk-cluster/hosts.yml variables and set the server and DPU's OOB IP addresses
+- Adjust inventory/f5-bnk-cluster/hosts.yml variables and set the server and DPU's OOB IP addresses.
+- Adjust network prefixes in resources/vlans.yaml and resources/bnk-gateway-class.yaml
 
 ### DPU
 

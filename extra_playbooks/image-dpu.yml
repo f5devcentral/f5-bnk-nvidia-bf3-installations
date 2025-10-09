@@ -130,44 +130,90 @@
       changed_when: "'Successfully' in (bfb_install_result.stdout | default('')) or
                      'Successfully' in (bfb_install_result.stderr | default(''))"
 
+    # --- Clean up old known_hosts backups first (handles known_hosts.old, .old.1, etc.)
+    - name: Find known_hosts backup files
+      ansible.builtin.find:
+        paths: "{{ lookup('env','HOME') }}/.ssh"
+        patterns: "known_hosts.old*"
+        file_type: file
+      delegate_to: localhost
+      become: false
+      run_once: true
+      register: kh_backups
+
+    - name: Remove known_hosts backup files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ kh_backups.files }}"
+      when: kh_backups.matched | default(0) | int > 0
+      delegate_to: localhost
+      become: false
+      run_once: true
+
     - name: Remove old SSH host keys for DPU {{ bfb_hostname }}
       ansible.builtin.known_hosts:
-        name: "{{ bfb_hostname }}"
+        name: "{{ item }}"
         state: absent
+        path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
       delegate_to: localhost
       become: false
+      run_once: true
+      loop:
+        - "{{ bfb_hostname }}"
+        - "{{ hostvars[bfb_hostname]['ansible_host'] }}"
 
-    - name: Remove old SSH host keys for DPU IP
-      ansible.builtin.command: ssh-keygen -R {{ hostvars[bfb_hostname]['ansible_host'] }}
-      delegate_to: localhost
-      become: false
-      failed_when: false
+    - name: Resolve DPU {{ bfb_hostname }} address
+      ansible.builtin.set_fact:
+        _dpu_addr: "{{ hostvars[bfb_hostname].ansible_host | default(bfb_hostname) }}"
 
-    - name: Wait until DPU {{ bfb_hostname }} is reachable via ping
+    - name: Verify where this will run from
+      ansible.builtin.debug:
+        msg: "Probing {{ _dpu_addr }}:22 from {{ inventory_hostname }} (override any inherited delegation)"
+
+    - name: Show target used for wait_for
+      ansible.builtin.debug:
+        msg: "Waiting for SSH on {{ _dpu_addr }}:22"
+
+    # Force the probe to run from the worker (or another reachable hop),
+    # not from localhost and not from an inherited delegate.
+    - name: Wait for SSH on {{ bfb_hostname }} (fast retry, run from worker)
       ansible.builtin.wait_for:
-        host: "{{ bfb_hostname }}"
-        port: 22            # Wait for SSH port (better than raw ICMP)
-        delay: 5            # Initial delay before first try
-        timeout: 900        # Total seconds to wait (15 minutes)
+        host: "{{ _dpu_addr }}"
+        port: 22
+        connect_timeout: 3
+        timeout: 12
+        sleep: 2
         state: started
-      delegate_to: localhost
+      delegate_to: "{{ inventory_hostname }}"   # override inherited 'localhost'
       become: false
+      register: ssh_wait
+      retries: 20
+      delay: 3
+      until: ssh_wait is succeeded
 
-    - name: Install our controller’s SSH public key on the DPU
+    - name: Install our controller's SSH public key on the DPU
       ansible.builtin.command: >
         sshpass -p "{{ DPU_UBUNTU_PASSWORD }}"
         ssh-copy-id
         -i {{ ssh_pubkey_path }}
         -o StrictHostKeyChecking=no
-        ubuntu@{{ bfb_hostname }}
+        -o UserKnownHostsFile=/dev/null
+        ubuntu@{{ hostvars[bfb_hostname]['ansible_host'] }}
       delegate_to: localhost
       become: false
 
-    - name: Accept new SSH host key for DPU {{ bfb_hostname }}
-      ansible.builtin.command: >
-        ssh-keyscan -H {{ bfb_hostname }} >> {{ lookup('env', 'HOME') }}/.ssh/known_hosts
+    - name: Add new SSH host key for DPU
+      ansible.builtin.known_hosts:
+        name: "{{ item }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan -H ' + item) }}"
+        state: present
+        path: "{{ lookup('env', 'HOME') }}/.ssh/known_hosts"
       delegate_to: localhost
       become: false
+      loop:
+        - "{{ bfb_hostname }}"
+        - "{{ hostvars[bfb_hostname]['ansible_host'] }}"
 
   handlers:
     - name: Show BFB config path

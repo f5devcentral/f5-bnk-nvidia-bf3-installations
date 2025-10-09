@@ -10,7 +10,7 @@
     doca_keyring_asc: "/usr/share/keyrings/doca-archive-keyring.asc"
     doca_apt_packages:
       - ca-certificates
-      - doca-networking
+      - rshim
       - pv
       - curl
       - jq
