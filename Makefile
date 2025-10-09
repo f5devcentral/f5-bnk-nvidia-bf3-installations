@@ -60,6 +60,13 @@ bnk-gateway-class:
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/bnk-gateway-class.yml
 
+.PHONY: nvidia-gpu-operator
+nvidia-gpu-operator:
+	helm repo add nvidia https://nvidia.github.io/gpu-operator --force-update
+	helm repo update
+	helm upgrade --install --namespace gpu-operator --create-namespace \
+		gpu-operator nvidia/gpu-operator
+
 .PHONY: clean
 clean:
 	@echo "removing bnk gateway class ..."
