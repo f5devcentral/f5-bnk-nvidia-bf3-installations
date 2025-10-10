@@ -12,14 +12,14 @@ network:
     internal:
       id: 200
       link: ens16f0np0
-      mtu: 8996
+      mtu: 9000
       addresses:
         - 198.18.100.12/24
         - 2001::198:18:100:12/64
     external:
       id: 210
       link: ens16f0np0
-      mtu: 8996
+      mtu: 9000
       addresses:
         - 192.0.2.12/24
         - 2001::192:0:2:12/64
