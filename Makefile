@@ -1,12 +1,12 @@
 S_VERSION ?= $(shell cat .kubespray-version)
 INV ?= inventory/f5-bnk-cluster
 KS_DIR ?= .deps/kubespray
+SHELL := /bin/bash
 
 all: doca dpu cluster bnk bnk-gateway-class
 
 .PHONY: doca
 doca:
-	source .venv/bin/activate && \
 	ansible-playbook -i $(INV)/hosts.yaml extra_playbooks/install-doca.yml -b
 
 .PHONY: dpu
