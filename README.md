@@ -37,6 +37,10 @@ make doca
 BFB image is automatically downloaded and installed using the config template [dpu/bf-template.conf](dpu/bf-template.conf) via
 ansible. Enter the desired ubuntu password for the DPU OS, must be at least 12 characters long, when asked.
 
+Make sure `sshpass` is installed on the host where make is executed. It is used to enable ssh key based access to DPU nodes after
+imaging. Script `scripts/install-requirements.sh` does that for apt based systems, while also installing kubectl, helm, k9s etc.
+
+
 ```
 $ make dpu
 Bluefield-3 DPU set user ubuntu password (at least 12 characters):
