@@ -12,7 +12,7 @@ doca:
 
 .PHONY: dpu
 dpu:
-	@read -s -p "Bluefield-3 DPU set user ubuntu password (at least 12 characters): " pw; \
+	@read -p "Bluefield-3 DPU set user ubuntu password (at least 12 characters): " pw; \
 	export DPU_UBUNTU_PASSWORD=$$pw; \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/image-dpu.yml -b # -vv --check
