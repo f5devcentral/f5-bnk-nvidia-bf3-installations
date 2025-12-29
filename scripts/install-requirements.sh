@@ -5,9 +5,24 @@ set -e
 sudo apt-get update
 sudo apt-get install -y curl ca-certificates make htop btop jq tmux mosh net-tools \
   bwm-ng tcpdump python3-pip unzip ipmitool nfs-common pv software-properties-common \
-  locales qemu-guest-agent ansible-core sshpass
+  locales qemu-guest-agent sshpass
 
 sudo apt autoremove -y
+
+echo ""
+echo "install ansible 2.16.4 ..."
+rm -rf .venv
+python3 -m venv .venv
+
+source .venv/bin/activate
+pip install -U pip
+pip install "ansible-core==2.16.4"
+
+source .venv/bin/activate
+command -v ansible
+command -v ansible-playbook
+ansible --version
+ansible-playbook --version
 
 # use newer version of mosh
 #sudo add-apt-repository ppa:keithw/mosh-dev -y
@@ -20,6 +35,7 @@ sudo apt autoremove -y
 echo ""
 echo "installing k9s ..."
 VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep tag_name | cut -d '"' -f 4)
+echo "https://github.com/derailed/k9s/releases/download/${VERSION}/k9s_Linux_amd64.tar.gz"
 curl -Lo k9s.tar.gz "https://github.com/derailed/k9s/releases/download/${VERSION}/k9s_Linux_amd64.tar.gz"
 tar -xzf k9s.tar.gz k9s
 sudo mv k9s /usr/local/bin/

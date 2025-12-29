@@ -7,6 +7,7 @@ all: doca dpu cluster bnk bnk-gateway-class
 
 .PHONY: doca
 doca:
+	source .venv/bin/activate && \
 	ansible-playbook -i $(INV)/hosts.yaml extra_playbooks/install-doca.yml -b
 
 .PHONY: dpu

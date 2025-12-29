@@ -38,12 +38,54 @@ all:
         value: 65535
 
   hosts:
-    worker1:
-      ansible_host: 192.168.68.101
-      ansible_user: mwiget
+    control1:
+      ansible_host: 192.168.68.57
+      ansible_user: ubuntu
       ansible_become: true
-      ip: 192.168.68.101
-      access_ip: 192.168.68.101
+      ip: 192.168.68.57
+      access_ip: 192.168.68.57
+      additional_sysctl:
+        - name: fs.inotify.max_user_watches
+          value: 524288
+        - name: fs.inotify.max_user_instances
+          value: 8192
+        - name: fs.inotify.max_queued_events
+          value: 16384
+
+    control2:
+      ansible_host: 192.168.68.61
+      ansible_user: ubuntu
+      ansible_become: true
+      ip: 192.168.68.61
+      access_ip: 192.168.68.61
+      additional_sysctl:
+        - name: fs.inotify.max_user_watches
+          value: 524288
+        - name: fs.inotify.max_user_instances
+          value: 8192
+        - name: fs.inotify.max_queued_events
+          value: 16384
+
+    control3:
+      ansible_host: 192.168.68.65
+      ansible_user: ubuntu
+      ansible_become: true
+      ip: 192.168.68.65
+      access_ip: 192.168.68.65
+      additional_sysctl:
+        - name: fs.inotify.max_user_watches
+          value: 524288
+        - name: fs.inotify.max_user_instances
+          value: 8192
+        - name: fs.inotify.max_queued_events
+          value: 16384
+
+    worker1:
+      ansible_host: 192.168.68.66
+      ansible_user: ubuntu
+      ansible_become: true
+      ip: 192.168.68.66
+      access_ip: 192.168.68.66
       additional_sysctl:
         - name: fs.inotify.max_user_watches
           value: 524288
@@ -64,11 +106,11 @@ all:
         - "dpu=true:NoSchedule"
 
     worker2:
-      ansible_host: 192.168.68.95
-      ansible_user: mwiget
+      ansible_host: 192.168.68.71
+      ansible_user: ubuntu
       ansible_become: true
-      ip: 192.168.68.95
-      access_ip: 192.168.68.95
+      ip: 192.168.68.71
+      access_ip: 192.168.68.71
       additional_sysctl:
         - name: fs.inotify.max_user_watches
           value: 524288
@@ -91,7 +133,9 @@ all:
   children:
     kube_control_plane:
       hosts:
-        worker1: {}
+        control1: {}
+        control2: {}
+        control3: {}
 
     kube_node:
       hosts:
@@ -107,7 +151,9 @@ all:
 
     etcd:
       hosts:
-        worker1: {}
+        control1: {}
+        control2: {}
+        control3: {}
 
     k8s_cluster:
       children:
