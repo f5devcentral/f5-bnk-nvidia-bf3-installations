@@ -156,11 +156,15 @@ Check cluster via kubectl
 $ export KUBECONFIG=$PWD/inventory/f5-bnk-cluster/artifacts/admin.conf
 
 $ kubectl get node -o wide
-NAME          STATUS   ROLES           AGE     VERSION   INTERNAL-IP      EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION          CONTAINER-RUNTIME
-worker1       Ready    control-plane   3m36s   v1.32.8   192.168.68.104   <none>        Ubuntu 22.04.5 LTS   5.15.0-157-generic      containerd://2.0.6
-worker1-dpu   Ready    <none>          2m47s   v1.32.8   192.168.68.79    <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
-worker2       Ready    <none>          3m      v1.32.8   192.168.68.101   <none>        Ubuntu 22.04.5 LTS   5.15.0-157-generic      containerd://2.0.6
-Worker2-dpu   Ready    <none>          2m47s   v1.32.8   192.168.68.96    <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
+NAME          STATUS   ROLES           AGE   VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION          CONTAINER-RUNTIME
+control1      Ready    control-plane   15m   v1.32.8   192.168.68.57   <none>        Ubuntu 22.04.5 LTS   5.15.0-164-generic      containerd://2.0.6
+control2      Ready    control-plane   15m   v1.32.8   192.168.68.61   <none>        Ubuntu 22.04.5 LTS   5.15.0-164-generic      containerd://2.0.6
+control3      Ready    control-plane   15m   v1.32.8   192.168.68.65   <none>        Ubuntu 22.04.5 LTS   5.15.0-164-generic      containerd://2.0.6
+worker1       Ready    <none>          14m   v1.32.8   192.168.68.66   <none>        Ubuntu 22.04.5 LTS   5.15.0-164-generic      containerd://2.0.6
+worker1-dpu   Ready    <none>          14m   v1.32.8   192.168.68.79   <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
+worker2       Ready    <none>          14m   v1.32.8   192.168.68.71   <none>        Ubuntu 22.04.5 LTS   5.15.0-164-generic      containerd://2.0.6
+worker2-dpu   Ready    <none>          14m   v1.32.8   192.168.68.96   <none>        Ubuntu 22.04.5 LTS   5.15.0-1060-bluefield   containerd://2.0.6
+
 ```
 
 ### Deploy BNK 
