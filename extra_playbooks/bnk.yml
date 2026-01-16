@@ -39,6 +39,42 @@
         msg: "Required file f5_far_auth_key not found at {{ far_key_tgz }}"
       when: not far_key_stat.stat.exists
 
+    - name: Read service account key from tgz
+      ansible.builtin.command: >
+        tar zxOf {{ lookup('env','HOME') }}/far/f5-far-auth-key.tgz
+      register: far_service_account_key
+      changed_when: false
+
+    - name: Build SERVICE_ACCOUNT_K8S_SECRET
+      ansible.builtin.set_fact:
+        service_account_k8s_secret: >-
+          {{ ('_json_key_base64:' ~ (far_service_account_key.stdout | trim)) | b64encode }}
+
+    - name: Create far-secret.yaml (kubernetes.io/dockerconfigjson)
+      ansible.builtin.copy:
+        dest: "{{ far_secret_file }}"
+        mode: "0600"
+        content: |
+          ---
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: far-secret
+          type: kubernetes.io/dockerconfigjson
+          data:
+            .dockerconfigjson: >-
+              {{
+                (
+                  {
+                    "auths": {
+                      "repo.f5.com": {
+                        "auth": service_account_k8s_secret
+                      }
+                    }
+                  } | to_json
+                ) | b64encode
+              }}
+
     - name: Verify f5_jwt_token file exists
       ansible.builtin.stat:
         path: "{{ jwt_file }}"
