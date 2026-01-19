@@ -3,19 +3,27 @@ INV ?= inventory/f5-bnk-cluster
 KS_DIR ?= .deps/kubespray
 SHELL := /bin/bash
 
+VENV ?= .venv
+PLAYBOOKS ?= extra_playbooks
+
+ANSIBLE_PLAYBOOK := $(VENV)/bin/ansible-playbook
+
+# Helper macro: $(call ap,<playbook>,<extra args>)
+define ap
+	$(ANSIBLE_PLAYBOOK) -i $(INV)/hosts.yaml $(PLAYBOOKS)/$(1) $(2)
+endef
+
 all: cluster bnk bnk-gateway-class
 
 .PHONY: doca
 doca:
-	source .venv/bin/activate && \
-	ansible-playbook -i $(INV)/hosts.yaml extra_playbooks/install-doca.yml -b
+	$(call ap,install-doca.yml,-b)
 
 .PHONY: dpu
 dpu:
 	@read -p "Bluefield-3 DPU set user ubuntu password (at least 12 characters): " pw; \
 	export DPU_UBUNTU_PASSWORD=$$pw; \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/image-dpu.yml -b # -vv --check
+	$(call ap,image-dpu.yml,-b) # -vv --check
 
 .PHONY: cluster
 cluster:
@@ -24,51 +32,35 @@ cluster:
 
 .PHONY: sriov
 sriov:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/sriov.yml
+	$(call ap,sriov.yml,)
 
 .PHONY: local-path-provisioner
 local-path-provisioner:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/local-path-provisioner.yml
+	$(call ap,local-path-provisioner.yml,)
 
 .PHONY: nfs-csi
 nfs-csi:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-	  extra_playbooks/nfs-csi.yml
+	$(call ap,nfs-csi.yml,)
 
 .PHONY: nfs-storageclass
 nfs-storageclass:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/nfs-storageclass.yml
+	$(call ap,nfs-storageclass.yml,)
 
 .PHONY: cert-manager
 cert-manager:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/cert-manager.yml
+	$(call ap,cert-manager.yml,)
 
 .PHONY: grafana
 grafana:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/grafana.yml
+	$(call ap,grafana.yml,)
 
 .PHONY: bnk
-bnk: sriov local-path-provisioner nfs-csi nfs-storageclass cert-manager grafana bnk
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/bnk.yml
+bnk: sriov local-path-provisioner nfs-csi nfs-storageclass cert-manager grafana
+	$(call ap,bnk.yml,)
 
 .PHONY: bnk-gateway-class
 bnk-gateway-class:
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/bnk-gateway-class.yml
+	$(call ap,bnk-gateway-class.yml,)
 
 .PHONY: nvidia-gpu-operator
 nvidia-gpu-operator:
@@ -80,9 +72,7 @@ nvidia-gpu-operator:
 .PHONY: clean
 clean:
 	@echo "removing bnk gateway class ..."
-	source .venv/bin/activate && \
-	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
-		extra_playbooks/clean-bnk.yml
+	$(call ap,clean-bnk.yml,)
 
 .PHONY: clean-all
 clean-all:
