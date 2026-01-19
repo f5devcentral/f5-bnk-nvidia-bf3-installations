@@ -3,7 +3,7 @@ INV ?= inventory/f5-bnk-cluster
 KS_DIR ?= .deps/kubespray
 SHELL := /bin/bash
 
-all: doca dpu cluster bnk bnk-gateway-class
+all: cluster bnk bnk-gateway-class
 
 .PHONY: doca
 doca:
@@ -20,44 +20,53 @@ dpu:
 .PHONY: cluster
 cluster:
 	./scripts/run-playbook.sh
+	./scripts/kubeconfig.sh
 
 .PHONY: sriov
 sriov:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/sriov.yml
 
 .PHONY: local-path-provisioner
 local-path-provisioner:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/local-path-provisioner.yml
 
 .PHONY: nfs-csi
 nfs-csi:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 	  extra_playbooks/nfs-csi.yml
 
 .PHONY: nfs-storageclass
 nfs-storageclass:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/nfs-storageclass.yml
 
 .PHONY: cert-manager
 cert-manager:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/cert-manager.yml
 
 .PHONY: grafana
 grafana:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/grafana.yml
 
 .PHONY: bnk
 bnk: sriov local-path-provisioner nfs-csi nfs-storageclass cert-manager grafana bnk
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/bnk.yml
 
 .PHONY: bnk-gateway-class
 bnk-gateway-class:
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/bnk-gateway-class.yml
 
@@ -71,6 +80,7 @@ nvidia-gpu-operator:
 .PHONY: clean
 clean:
 	@echo "removing bnk gateway class ..."
+	source .venv/bin/activate && \
 	ansible-playbook -i inventory/f5-bnk-cluster/hosts.yaml \
 		extra_playbooks/clean-bnk.yml
 
