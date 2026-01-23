@@ -4,6 +4,12 @@ global:
   certmgr:
     clusterIssuer: bnk-ca-cluster-issuer
  
+rbac:
+  create: true 
+containerPlatform: Generic
+ServiceIPFamily: ipv4
+sharedComponentNamespace: "" 
+
 image:
   repository: repo.f5.com/images
   name: f5-lifecycle-operator

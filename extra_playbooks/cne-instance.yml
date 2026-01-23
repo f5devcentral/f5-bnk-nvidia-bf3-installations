@@ -16,7 +16,7 @@
       - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
 
     # Manifests used by the script
-    bnkgwc_manifest: "bnk-gateway-class.yaml"
+    bnkgwc_manifest: "cne-instance.yaml"
     vlans_manifest: "vlans.yaml"
     zebos_cm_manifest: "zebos-bgp-cm.yaml"
 
@@ -159,18 +159,18 @@
       when:
         - (item.value | default('')) | length > 0
 
-    # --- Apply BNKGatewayClass ---
-    - name: Verify BNKGatewayClass manifest exists
+    # --- Apply CNEInstance ---
+    - name: Verify CNEInstance manifest exists
       ansible.builtin.stat:
         path: "{{ resources_dir }}/{{ bnkgwc_manifest }}"
       register: _bnkgwc
 
-    - name: Fail if BNKGatewayClass manifest missing
+    - name: Fail if CNEInstance manifest missing
       ansible.builtin.fail:
         msg: "Missing {{ resources_dir }}/{{ bnkgwc_manifest }}"
       when: not _bnkgwc.stat.exists
 
-    - name: Apply BNKGatewayClass manifest
+    - name: Apply CNEInstance manifest
       ansible.builtin.command:
         cmd: kubectl apply -f {{ resources_dir }}/{{ bnkgwc_manifest }}
 
@@ -224,7 +224,7 @@
       ansible.builtin.command: >
         kubectl apply -f {{ resources_dir }}/{{ item }}
       loop:
-        - bnk-gateway-class.yaml
+        - cne-instance.yaml
         - vlans.yaml
         - zebos-bgp-cm.yaml
       register: apply_out

@@ -1,14 +1,18 @@
 apiVersion: k8s.f5.com/v1
-kind: BNKGatewayClass
+kind: CNEInstance
 metadata:
   labels:
     app.kubernetes.io/name: f5-lifecycle-operator
     app.kubernetes.io/managed-by: kustomize
   name: bnkgatewayclass-dpu
 spec:
-  manifestVersion: "2.1.0-3.1736.1-0.1.27"
-  storageClassName: "nfs"
-  containerPlatform: Generic
+  product:
+    gatewayAPI: false
+    type: BNK
+  manifestVersion: "2.2.0-3.2226.0-0.0.385"
+  wholeCluster: true
+  dpu:
+    enabled: true
   telemetry:
     loggingSubsystem:
       enabled: false
@@ -18,8 +22,8 @@ spec:
     clusterIssuer: bnk-ca-cluster-issuer
       # deploymentSize: "Max"
   deploymentSize: "Large"
-  image:
-    repository: "repo.f5.com/images"
+  registry:
+    uri: repo.f5.com
     imagePullSecrets:
     - name: far-secret
     imagePullPolicy: Always
@@ -54,19 +58,16 @@ spec:
       env:
       - name: "TMM_DEFAULT_MTU"
         value: "9000"
-    pseudoCNI:
-      env:
-      - name: "EXCLUDE_CIDR"
-        value: "198.18.100.0/24,192.0.2.0/24,192.168.68.0/22"
     tmm:
       env:
       - name: "TMM_CALICO_ROUTER"
         value: "default"
       - name: "TMM_DEFAULT_MTU"
         value: "9000"
+      - name: "ZEBOS_STATE"
+        value: legacy
       #      - name: "TMM_LOG_LEVEL"
       #        value: "Debug" 
- 
     #firewallACL:
     #  env:
     #  -name: "LOG_LEVEL"
@@ -74,3 +75,7 @@ spec:
  
     #cwc:
     #  env:
+    pseudoCNI:
+      env:
+      - name: "EXCLUDE_CIDR"
+        value: "198.18.100.0/24,192.0.2.0/24,192.168.68.0/22"

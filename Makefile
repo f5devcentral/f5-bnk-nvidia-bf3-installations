@@ -13,7 +13,7 @@ define ap
 	$(ANSIBLE_PLAYBOOK) -i $(INV)/hosts.yaml $(PLAYBOOKS)/$(1) $(2)
 endef
 
-all: cluster bnk bnk-gateway-class
+all: cluster bnk cne-instance
 
 .PHONY: doca
 doca:
@@ -58,9 +58,9 @@ grafana:
 bnk: sriov local-path-provisioner nfs-csi nfs-storageclass cert-manager grafana
 	$(call ap,bnk.yml,)
 
-.PHONY: bnk-gateway-class
-bnk-gateway-class:
-	$(call ap,bnk-gateway-class.yml,)
+.PHONY: cne-instance
+cne-instance:
+	$(call ap,cne-instance.yml,)
 
 .PHONY: nvidia-gpu-operator
 nvidia-gpu-operator:
