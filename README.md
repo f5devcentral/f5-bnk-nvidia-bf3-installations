@@ -175,10 +175,10 @@ This adds all relevant components for BNK to the cluster like sriov nfs storage 
 $ make bnk
 ```
 
-### Deploy BNK Gateway Class
+### Deploy CNE Instance and VLANS
 
 ```
-$ make bnk-gateway-class
+$ make cne-instance
 
 TASK [Print f5-spk-vlans table nicely] **************************************************************************************************************************************************************************
 ok: [localhost] => (item=NAME       READY   MESSAGE                                AGE) => {
@@ -195,9 +195,57 @@ PLAY RECAP *********************************************************************
 localhost
 ```
 
+### Verify PODs
+
+```
+$ kubectl get pod -o wide
+NAME                                 READY   STATUS    RESTARTS   AGE     IP               NODE          NOMINATED NODE   READINESS GATES
+f5-afm-c5b44d889-jvvfb               1/1     Running   0          3m5s    10.233.105.159   worker1       <none>           <none>
+f5-cne-controller-7fd9c5b45f-7rt96   4/4     Running   0          3m4s    10.233.125.26    worker2       <none>           <none>
+f5-downloader-67d48694cc-zx6fq       1/1     Running   0          3m5s    10.233.105.167   worker1       <none>           <none>
+f5-dssm-db-0                         2/2     Running   0          3m5s    10.233.105.161   worker1       <none>           <none>
+f5-dssm-db-1                         2/2     Running   0          2m28s   10.233.125.27    worker2       <none>           <none>
+f5-dssm-db-2                         2/2     Running   0          111s    10.233.105.170   worker1       <none>           <none>
+f5-dssm-sentinel-0                   2/2     Running   0          3m5s    10.233.125.24    worker2       <none>           <none>
+f5-dssm-sentinel-1                   2/2     Running   0          2m17s   10.233.105.169   worker1       <none>           <none>
+f5-dssm-sentinel-2                   2/2     Running   0          101s    10.233.105.171   worker1       <none>           <none>
+f5-tmm-26n4z                         6/6     Running   0          3m      10.233.111.133   worker1-dpu   <none>           2/2
+f5-tmm-82djh                         6/6     Running   0          3m2s    10.233.89.5      worker2-dpu   <none>           2/2
+
+```
+
 ### Destroy Cluster
 
 ```
 $ make clean-all
 ```
 
+
+### Caveats
+
+If vlans don't show up in TMM pod, check vlans status with
+
+```
+$ kubectl get f5-spk-vlan
+NAME       READY   MESSAGE                                AGE
+external   True    CR config sent to all grpc endpoints   9m47s
+internal   True    CR config sent to all grpc endpoints   9m47s
+
+
+If there is no message, check JWT license by looking at the log of deployment/f5-spk-cwc in namespace f5-utils.
+Use helper script `scripts/check-license-log.sh`
+
+If the message says in progress, even after 5 minutes, delete vlans and cne-instance and deploy again:
+
+```
+kubectl delete -f resources/vlans.yaml
+kubectl delete -f resources/cne-instance.yaml
+G
+
+wait until tmm pods are gone, then redeploy using
+
+```
+make cne-instance
+```
+```
+```

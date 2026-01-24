@@ -1,5 +1,5 @@
 ---
-- name: Configure BNK GatewayClass (node annotations, VLANs, BGP/ZebOS)
+- name: Configure CNE instance, (node annotations, BGP/ZebOS)
   hosts: localhost
   gather_facts: false
   any_errors_fatal: true
@@ -16,7 +16,7 @@
       - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
 
     # Manifests used by the script
-    bnkgwc_manifest: "cne-instance.yaml"
+    cne_instance_manifest: "cne-instance.yaml"
     vlans_manifest: "vlans.yaml"
     zebos_cm_manifest: "zebos-bgp-cm.yaml"
 
@@ -162,17 +162,17 @@
     # --- Apply CNEInstance ---
     - name: Verify CNEInstance manifest exists
       ansible.builtin.stat:
-        path: "{{ resources_dir }}/{{ bnkgwc_manifest }}"
-      register: _bnkgwc
+        path: "{{ resources_dir }}/{{ cne_instance_manifest }}"
+      register: _cne_instance
 
     - name: Fail if CNEInstance manifest missing
       ansible.builtin.fail:
-        msg: "Missing {{ resources_dir }}/{{ bnkgwc_manifest }}"
-      when: not _bnkgwc.stat.exists
+        msg: "Missing {{ resources_dir }}/{{ cne_instance_manifest }}"
+      when: not _cne_instance.stat.exists
 
     - name: Apply CNEInstance manifest
       ansible.builtin.command:
-        cmd: kubectl apply -f {{ resources_dir }}/{{ bnkgwc_manifest }}
+        cmd: kubectl apply -f {{ resources_dir }}/{{ cne_instance_manifest }}
 
     # --- Apply VLANs with retry (like 'until kubectl apply ...; sleep 5') ---
     - name: Verify VLANs manifest exists
