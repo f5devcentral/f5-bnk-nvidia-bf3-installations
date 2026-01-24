@@ -214,6 +214,22 @@ f5-tmm-82djh                         6/6     Running   0          3m2s    10.233
 
 ```
 
+Check vlans within debug tmm pod:
+
+
+```
+$ kubectl exec -ti f5-tmm-26n4z -c debug -- bash -c 'ip -br l'
+lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP> 
+xeth0@if32       UP             c6:6b:aa:5b:d4:78 <BROADCAST,MULTICAST,ALLMULTI,UP,LOWER_UP> 
+tmm              UP             00:98:76:54:32:10 <BROADCAST,MULTICAST,UP,LOWER_UP> 
+eth0             UNKNOWN        c6:6b:aa:5b:d4:78 <BROADCAST,MULTICAST,UP,LOWER_UP> 
+tmm_bp           UNKNOWN        02:01:23:45:00:01 <BROADCAST,MULTICAST,UP,LOWER_UP> 
+external         UNKNOWN        02:fb:96:a4:7f:5a <BROADCAST,MULTICAST,UP,LOWER_UP> 
+internal         UNKNOWN        02:ab:48:5e:44:d5 <BROADCAST,MULTICAST,UP,LOWER_UP> 
+enp3s0f0s1       UP             02:fb:96:a4:7f:5a <BROADCAST,MULTICAST,PROMISC,UP,LOWER_UP> 
+enp3s0f1s1       UP             02:ab:48:5e:44:d5 <BROADCAST,MULTICAST,PROMISC,UP,LOWER_UP>
+```
+
 ### Destroy Cluster
 
 ```
@@ -249,3 +265,4 @@ make cne-instance
 ```
 ```
 ```
+
