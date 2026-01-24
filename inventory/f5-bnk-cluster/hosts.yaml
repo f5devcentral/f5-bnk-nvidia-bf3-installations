@@ -3,7 +3,7 @@ all:
     f5_far_auth_key: "{{ lookup('env','HOME') }}/far/f5-far-auth-key.tgz"
     f5_jwt_token: "{{ lookup('env','HOME') }}/.jwt"
     flo_chart: "oci://repo.f5.com/charts/f5-lifecycle-operator"
-    flo_version: "v1.198.4-0.1.36"
+    flo_version: "v2.9.27-0.2.10"
 
     internal_network: "198.18.100.0/24"   # high speed east-west worker node network
     nfs_server: "192.168.68.8"
@@ -38,48 +38,6 @@ all:
         value: 65535
 
   hosts:
-    control1:
-      ansible_host: 192.168.68.57
-      ansible_user: ubuntu
-      ansible_become: true
-      ip: 192.168.68.57
-      access_ip: 192.168.68.57
-      additional_sysctl:
-        - name: fs.inotify.max_user_watches
-          value: 524288
-        - name: fs.inotify.max_user_instances
-          value: 8192
-        - name: fs.inotify.max_queued_events
-          value: 16384
-
-    control2:
-      ansible_host: 192.168.68.61
-      ansible_user: ubuntu
-      ansible_become: true
-      ip: 192.168.68.61
-      access_ip: 192.168.68.61
-      additional_sysctl:
-        - name: fs.inotify.max_user_watches
-          value: 524288
-        - name: fs.inotify.max_user_instances
-          value: 8192
-        - name: fs.inotify.max_queued_events
-          value: 16384
-
-    control3:
-      ansible_host: 192.168.68.65
-      ansible_user: ubuntu
-      ansible_become: true
-      ip: 192.168.68.65
-      access_ip: 192.168.68.65
-      additional_sysctl:
-        - name: fs.inotify.max_user_watches
-          value: 524288
-        - name: fs.inotify.max_user_instances
-          value: 8192
-        - name: fs.inotify.max_queued_events
-          value: 16384
-
     worker1:
       ansible_host: 192.168.68.66
       ansible_user: ubuntu
@@ -133,9 +91,7 @@ all:
   children:
     kube_control_plane:
       hosts:
-        control1: {}
-        control2: {}
-        control3: {}
+        worker1: {}
 
     kube_node:
       hosts:
@@ -151,9 +107,7 @@ all:
 
     etcd:
       hosts:
-        control1: {}
-        control2: {}
-        control3: {}
+        worker1: {}
 
     k8s_cluster:
       children:
