@@ -236,29 +236,3 @@ enp3s0f1s1       UP             02:ab:48:5e:44:d5 <BROADCAST,MULTICAST,PROMISC,U
 $ make clean-all
 ```
 
-### Caveats
-
-If vlans don't show up in TMM pod, check vlans status with
-
-```
-$ kubectl get f5-spk-vlan
-NAME       READY   MESSAGE                                AGE
-external   True    CR config sent to all grpc endpoints   9m47s
-internal   True    CR config sent to all grpc endpoints   9m47s
-```
-
-If there is no message, check JWT license by looking at the log of deployment/f5-spk-cwc in namespace f5-utils.
-Use helper script `scripts/check-license-log.sh`
-
-If the message says in progress, even after 5 minutes, delete vlans and cne-instance and deploy again:
-
-```
-kubectl delete -f resources/vlans.yaml
-kubectl delete -f resources/cne-instance.yaml
-```
-
-wait until tmm pods are gone, then redeploy using
-
-```
-make cne-instance
-```
