@@ -77,7 +77,7 @@
     # Write the config on the remote host (force real write even with --check)
     - name: Render BFB config on remote host
       ansible.builtin.template:
-        src: "{{ playbook_dir }}/../dpu/bf-template.conf"
+        src: "{{ bf_template }}"
         dest: "{{ BFB_CONFIG }}"             # e.g., /var/tmp/<node>-dpu.conf
         mode: "0600"
       check_mode: no
@@ -115,6 +115,9 @@
         mode: "0644"
         force: no
         timeout: 600
+
+#    - name: stop
+#      meta: end_play
 
     - name: Run bfb-install with rshim0
       ansible.builtin.command:

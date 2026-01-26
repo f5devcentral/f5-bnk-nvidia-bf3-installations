@@ -5,13 +5,13 @@ all:
     flo_chart: "oci://repo.f5.com/charts/f5-lifecycle-operator"
     flo_version: "v2.9.27-0.2.10"
 
-    internal_network: "198.18.100.0/24"   # high speed east-west worker node network
+    internal_network: "10.10.41.0/24"   # high speed east-west worker node network
     nfs_server: "192.168.68.8"
     nfs_server_path: "/share/bnk"
 
     doca_version: 2.9.2
     bfb_image: "bf-bundle-2.9.2-32_25.02_ubuntu-22.04_prod.bfb"
-    bf_template: "{{ playbook_dir }}/../dpu/bf-template.conf"
+    bf_template: "{{ playbook_dir }}/../dpu/bf-static-template.conf"
 
     bfb_url_base: "https://content.mellanox.com/BlueField/BFBs/Ubuntu22.04"
     dpu_ubuntu_password: "{{ lookup('env', 'DPU_UBUNTU_PASSWORD_HASH') }}"
@@ -27,6 +27,8 @@ all:
 
     dpu_mtu: 9000
     calico_mtu: 8900
+    dns_ip: "192.168.68.1 1.1.1.1"
+    dns_domains: "mwlabs.net"
 
     pam_limits:
       - domain: "*"
@@ -59,6 +61,15 @@ all:
       ansible_become: true
       ip: 192.168.68.79
       access_ip: 192.168.68.79
+      oob_net0_ip: "192.168.68.79/24"
+      default_gateway: 192.168.68.1
+      vlans:
+        - name: vlan0
+          tag: 0
+          ip: "10.10.40.110/24"
+        - name: vlan41
+          tag: 41
+          ip: "10.10.41.110/24"
       node_labels:
         "app": "f5-tmm"
       node_taints:
@@ -70,6 +81,7 @@ all:
       ansible_become: true
       ip: 192.168.68.71
       access_ip: 192.168.68.71
+      default_gateway: 192.168.68.1
       additional_sysctl:
         - name: fs.inotify.max_user_watches
           value: 524288
@@ -84,6 +96,15 @@ all:
       ansible_become: true
       ip: 192.168.68.96
       access_ip: 192.168.68.96
+      oob_net0_ip: 192.168.68.96/24
+      default_gateway: 192.168.68.1
+      vlans:
+        - name: vlan0
+          tag: 0
+          ip: "10.10.40.115/24"
+        - name: vlan41
+          tag: 41
+          ip: "10.10.41.115/24"
       node_labels:
         "app": "f5-tmm"
       node_taints:
