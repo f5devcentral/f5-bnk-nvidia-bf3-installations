@@ -186,7 +186,7 @@
     # --- OTEL certificate (prereq) ---
     - name: Apply otel-cert.yaml
       ansible.builtin.command:
-        cmd: kubectl apply -f {{ resources_dir }}/otel-cert.yaml
+        cmd: kubectl -n f5-operators apply -f {{ resources_dir }}/otel-cert.yaml
 
     # --- Decide FLO values file based on JWT header ---
     - name: Read JWT (entire token)

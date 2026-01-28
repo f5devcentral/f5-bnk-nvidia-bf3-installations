@@ -43,7 +43,7 @@ prometheus:
       - role: pod
         namespaces:
           names:
-          - default
+          - f5-operators
       relabel_configs:
         - source_labels: [__meta_kubernetes_pod_label_metrics_prometheus, __meta_kubernetes_pod_container_port_number]
           regex: publish;9090
