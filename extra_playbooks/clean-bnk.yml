@@ -1,5 +1,5 @@
 ---
-- name: Clean BNK resources (GatewayClass, VLANs, ZebOS)
+- name: Clean BNK resources (cne-instance, VLANs, ZebOS)
   hosts: localhost
   gather_facts: false
   any_errors_fatal: true
@@ -14,7 +14,7 @@
       - "{{ repo_root }}/inventory/f5-bnk-cluster/resources"
 
     manifests:
-      - "bnk-gateway-class.yaml"
+      - "cne-instance.yaml"
       - "vlans.yaml"
       - "zebos-bgp-cm.yaml"
 
