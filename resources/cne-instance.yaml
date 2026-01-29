@@ -11,6 +11,7 @@ spec:
     type: BNK
   manifestVersion: "2.2.0-3.2226.0-0.0.385"
   wholeCluster: true
+  storageClassName: nfs
   dpu:
     enabled: true
   telemetry:
