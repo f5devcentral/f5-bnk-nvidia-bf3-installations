@@ -7,20 +7,13 @@ network:
       dhcp4: no
       dhcp6: no
       mtu: 9000
+      addresses:
+      - 10.10.40.114/24
 
   vlans:
-    internal:
-      id: 200
+    vlan41:
+      id: 41
       link: ens16f0np0
       mtu: 9000
       addresses:
-        - 198.18.100.12/24
-        - 2001::198:18:100:12/64
-    external:
-      id: 210
-      link: ens16f0np0
-      mtu: 9000
-      addresses:
-        - 192.0.2.12/24
-        - 2001::192:0:2:12/64
-
+        - 10.10.41.114/24

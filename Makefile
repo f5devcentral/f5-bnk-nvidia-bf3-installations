@@ -1,5 +1,6 @@
 S_VERSION ?= $(shell cat .kubespray-version)
-INV ?= inventory/f5-bnk-cluster
+INV ?= inventory/2node-static-ip
+#INV ?= inventory/f5-bnk-cluster
 KS_DIR ?= .deps/kubespray
 SHELL := /bin/bash
 
