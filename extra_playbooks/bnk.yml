@@ -147,7 +147,7 @@
       ansible.builtin.shell: |
         set -euo pipefail
         tar zxfO "{{ far_key_tgz }}" cne_pull_64.json \
-          | helm registry login -u _json_key_base64 --password-stdin https://repo.f5.com
+          | helm registry login -u _json_key_base64 --password-stdin repo.f5.com
       args:
         executable: /bin/bash
       register: helm_login
