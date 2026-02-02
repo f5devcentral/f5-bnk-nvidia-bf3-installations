@@ -1,0 +1,10 @@
+image:
+  repository: "nvcr.io/nim/nvidia/llama3.1-nemotron-nano-4b-v1.1"
+  tag: latest
+model:
+  ngcAPISecret: ngc-api  # name of a secret in the cluster that includes a key named NGC_CLI_API_KEY and is an NGC API key
+persistence:
+  enabled: true
+imagePullSecrets:
+  -   name: registry-secret # name of a secret used to pull nvcr.io images, see https://kubernetes.io/docs/tasks/    configure-pod-container/pull-image-private-registry/
+replicaCount: 2

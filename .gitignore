@@ -30,6 +30,8 @@ ENV/
 *.~*
 .deps
 artifacts
+*.tgz
+*.un~
 
 # Ignore MkDocs build artifacts
 /site/

@@ -14,7 +14,7 @@ define ap
 	$(ANSIBLE_PLAYBOOK) -i $(INV)/hosts.yaml $(PLAYBOOKS)/$(1) $(2)
 endef
 
-all: cluster bnk cne-instance
+all: cluster nvidia-gpu-operator bnk cne-instance
 
 .PHONY: doca
 doca:
